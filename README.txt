@@ -1,47 +1,63 @@
-GROK GRID
-=========
+GROK GRID 2.0
+=============
 
-Arcade F1. Crash the car, watch it come apart, try to finish 3 laps.
+Arcade open-wheel racer. 6 tracks, 5 cars, walls that hurt.
 
-How to run
-  Open this folder with a static server (needed for some browsers to load Three.js):
+What's new in 2.0
+-----------------
+- Five new circuits plus the original, each with its own layout, scenery
+  and light:
+    GROK PARK        classic parkland (original track, layout tidied)
+    HARBOUR STREETS  city street circuit, 90-degree corners, chicane
+    RED ROCK CANYON  desert sweepers between mesas, rolling elevation
+    ALPINE SUMMIT    snowy mountain pass, big climbs and crests
+    MIDNIGHT NEON    night track, floodlights and glowing barriers
+    SUNSET COAST     seaside run with palms at golden hour
+  The track select screen shows a mini map of each circuit.
+- Smarter rivals: they follow a racing line, brake for corners, overtake
+  on the inside, slipstream, and keep pace with you (rubber-banding).
+  Choose RIVALS: EASY / NORMAL / HARD. Normal is much quicker than 1.0.
+- LAPS: 1 / 3 / 5.
+- Best lap per track and best race time per track/lap count are saved in
+  your browser (localStorage).
+- CHAMPIONSHIP: all six tracks in a row, points 10-6-4-2-1. A DNF scores
+  nothing. You can leave and continue the season later.
+- Pause button (or Esc / P). The game also pauses if you switch apps.
+- Phone: landscape layout tuned, steering has a small dead zone, and the
+  resolution adapts if frames drop.
 
-    python3 -m http.server 8080
+Run it
+------
+Serve the folder (file:// will not load modules of this size reliably in
+some browsers, so use a local server):
 
-  Then visit http://localhost:8080/
+  cd grok-f1
+  python3 -m http.server 8080
 
-  Relative paths only — also works on GitHub Pages. A local copy of Three.js
-  lives in three.min.js (no CDN required).
+Then open http://localhost:8080
 
-Controls (desktop)
-  W / Arrow Up           accelerate
-  S / Arrow Down / Space brake
-  A D or Left / Right    steer
-  Shift                  handbrake (big slides)
-  Enter                  start / retry from overlays
-  ♪ button               mute engine
-
-Controls (phone / tablet)
-  Left pad               steer (drag)
-  ACCEL / BRAKE          right-side pedals
-  Touch is auto-detected and the HUD keeps clear of the home indicator.
-
-How to play
-  3 laps around Grok Park against 4 AI cars. Hold it on the black stuff.
-  Grass is slow. Barriers bite. Other cars bite too.
+Controls
+--------
+Desktop:  W / ↑ accelerate
+          S / ↓ / Space  brake
+          A D or arrows  steer
+          Shift          handbrake
+Mobile:   left stick to steer, ACCEL / BRAKE on the right
+♪ button  mute engine and impacts
+II button pause (Esc / P on desktop)
 
 Damage
-  Hits against walls, tecpro, or other cars fill the DAMAGE bar.
-  Light scrape     scuffed paint, a little less grip
-  ~25%             front wing bends, handling goes off
-  ~40–50%          front wing gone, smoke, lower top speed
-  ~70%             rear wing folds / rips off, car gets loose
-  100%             DNF — terminal damage, retry from the overlay
+------
+Hits against barriers or other cars raise the DAMAGE bar (0–100).
 
-  More damage = slower, worse grip, smoke, and a wobbly steering rack.
+  Scuffs        cheap, you keep most of the car
+  Medium hits   front wing droops, top speed and grip drop
+  Heavy hits    rear wing folds, smoke, random stalls
+  100%          TERMINAL — DNF, race over
 
-HUD
-  LAP, POS, lap time, best lap, speed (km/h), gear, damage bar, minimap.
+More damage means less top speed, heavier steering, and smoke off the
+engine cover. Visual damage (bent/missing wings, darkened body) matches
+the HUD. Retry from the DNF or chequered-flag card.
 
-Goal
-  Finish P1 if you can. Don't bin it.
+Title → (quick race: pick a track | championship) → lights out → finish or
+DNF → retry / next round.
