@@ -28,6 +28,8 @@
 
   const { TRACKS, elevAt, controlPoints } = window.GRID_TRACKS;
   const FIELD = 5;
+  // online play (grid-online.js): remote cars are driven by the network, not the AI / physics
+  const net = () => (window.GridNet && window.GridNet.active ? window.GridNet : null);
   const CAR_RADIUS = 1.35;
   const MAX_DAMAGE = 100;
   const POINTS = [10, 6, 4, 2, 1];
@@ -1436,7 +1438,7 @@
   }
 
   function gridPlace() {
-    const order = [1, 2, 0, 3, 4]; // car ids from pole: you start P3
+    const order = state.gridOrder || [1, 2, 0, 3, 4]; // car ids from pole: you start P3 (online: set by grid-online.js)
     const dset = DIFFS[settings.diff] || DIFFS.normal;
     const skillTab = [0, 0.6, -0.2, 0.2, -0.6];
     const powTab = [0, 0.5, 0, -0.3, -0.6];
@@ -1811,6 +1813,7 @@
       for (let j = i + 1; j < cars.length; j++) {
         const a = cars[i];
         const b = cars[j];
+        if (a.out || b.out) continue;
         const dx = b.x - a.x;
         const dz = b.z - a.z;
         const d2 = dx * dx + dz * dz;
@@ -1832,8 +1835,8 @@
           const impact = Math.abs(rel);
           if (impact > 6) {
             const dmg = impact < 16 ? (impact - 6) * 0.55 : 6 + (impact - 16) * 0.7;
-            addDamage(a, dmg * (a.isPlayer ? 1 : 0.7), impact);
-            addDamage(b, dmg * (b.isPlayer ? 1 : 0.7), impact);
+            if (!a.remote) addDamage(a, dmg * (a.isPlayer ? 1 : 0.7), impact);
+            if (!b.remote) addDamage(b, dmg * (b.isPlayer ? 1 : 0.7), impact);
             a.speed *= 0.78;
             b.speed *= 0.78;
           }
@@ -1845,7 +1848,7 @@
   }
 
   function rankCars() {
-    const live = cars.slice().sort((a, b) => {
+    const live = cars.filter((c) => !c.out).sort((a, b) => {
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
       if (a.finished && b.finished) return a.finishTime - b.finishTime;
       if (a.finished !== b.finished) return a.finished ? -1 : 1;
@@ -1934,6 +1937,11 @@
     else node.textContent = v;
   }
 
+  function activeCount() {
+    let n = 0;
+    for (const c of cars) if (!c.out) n++;
+    return n;
+  }
   function updateHUD() {
     const p = player;
     const kmh = Math.max(0, Math.round(Math.abs(p.speed) * 3.6));
@@ -1943,7 +1951,7 @@
     for (let i = 1; i < gtab.length; i++) if (kmh >= gtab[i]) g = i;
     setText(gearEl, 'gear', kmh < 8 ? 'N' : String(Math.min(8, g + 1)));
     setText(lapEl, 'lap', clamp(p.lap, 1, TOTAL_LAPS) + '<span class="dim">/' + TOTAL_LAPS + '</span>', true);
-    setText(posEl, 'pos', 'P' + p.place + '<span class="dim">/' + FIELD + '</span>', true);
+    setText(posEl, 'pos', 'P' + p.place + '<span class="dim">/' + activeCount() + '</span>', true);
     setText(laptimeEl, 'lt', fmtTime(p.lapTime));
     const best = Math.min(p.bestLap, state.bestLapSession);
     setText(bestEl, 'best', isFinite(best) && best < 1e8 ? fmtTime(best) : '—');
@@ -2006,8 +2014,9 @@
     const X = miniBg.X, Z = miniBg.Z;
     for (let i = cars.length - 1; i >= 0; i--) {
       const c = cars[i];
+      if (c.out) continue;
       ctx.beginPath();
-      ctx.arc(X(c.x), Z(c.z), c.isPlayer ? 4.5 : 3.2, 0, TAU);
+      ctx.arc(X(c.x), Z(c.z), c.isPlayer ? 4.5 : c.human ? 4 : 3.2, 0, TAU);
       ctx.fillStyle = c.isPlayer ? '#00e8ff' : c.dnf ? '#666' : c.css;
       ctx.fill();
       if (c.isPlayer) {
@@ -2263,6 +2272,7 @@
   }
 
   function togglePause() {
+    if (net()) return; // no pausing an online race
     if (state.mode !== 'race' && state.mode !== 'countdown') return;
     state.paused = !state.paused;
     if (state.paused) {
@@ -2294,6 +2304,7 @@
   function endFinish() {
     if (state.mode !== 'race') return;
     state.mode = 'finish';
+    if (net()) { rankCars(); net().onLocalEnd('finish'); return; }
     const ranked = rankCars();
     const p = player.place;
     const recordRace = state.autopilot ? false : persistRace(state.raceTime);
@@ -2324,6 +2335,7 @@
   function endDnf() {
     if (state.mode !== 'race' && state.mode !== 'countdown') return;
     state.mode = 'dnf';
+    if (net()) { rankCars(); net().onLocalEnd('dnf'); return; }
     const ranked = rankCars();
     dnfMsg.textContent = pick([
       'The car is done. Wings gone, pride gone.',
@@ -2354,6 +2366,7 @@
   }
 
   function onResultPrimary() {
+    if (net()) return; // online results have their own buttons
     if (state.inChamp) {
       if (champ.round >= TRACKS.length) {
         const st = champStandings();
@@ -2437,8 +2450,11 @@
       player.handbrake = 0;
     }
 
+    const N = net();
     for (let i = 0; i < cars.length; i++) {
       const car = cars[i];
+      if (car.out) continue;
+      if (car.remote && N) { N.stepRemote(car, dt); continue; }
       if (!car.isPlayer && racing) updateAI(car, dt);
       integrateCar(car, dt, racing && !car.dnf && !(car.isPlayer && car.finished));
     }
@@ -2503,6 +2519,8 @@
     selectTrack,
     startRace: (o) => startRace(o),
     openTrackSelect, openChampionship, goTitle, togglePause, onResultPrimary,
+    rankCars, showOverlay, hideOverlay, setRacingChrome, fmtTime, syncCarMesh, applyVisualDamage, snapCamera, gridPlace, setStartLights,
+    get countdownEl() { return countdownEl; },
     setAutopilot: (on) => {
       state.autopilot = !!on;
     },
