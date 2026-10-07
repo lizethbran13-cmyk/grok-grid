@@ -1,6 +1,6 @@
 'use strict';
 
-/* GROK GRID 2.0 — arcade open-wheel racer (THREE r128 global, tracks from tracks.js) */
+/* GROK GRID 3.0 — arcade open-wheel racer (THREE r128 global, tracks from tracks.js) */
 
 (function () {
   const TAU = Math.PI * 2;
@@ -33,6 +33,15 @@
   const CAR_RADIUS = 1.35;
   const MAX_DAMAGE = 100;
   const POINTS = [10, 6, 4, 2, 1];
+
+  // 3.0 steering. Max front-wheel angle (as a fraction) by speed; yaw rate = angle * YAW_GAIN * grip.
+  // 2.0 used 0.52 - 0.30*v/85, which left only ~29 deg/s of turn at top speed (153 m turning circle)
+  // and ~0.9 rad/s even at low speed: the car physically could not make many corners, so phone
+  // players ran into the walls. 3.0 keeps far more lock at speed (~61 deg/s flat out).
+  const YAW_GAIN = 2.25;
+  const STEER_LO = 0.66; // lock at a standstill
+  const STEER_DROP = 0.2; // lock lost by 85 m/s
+  const steerLimit = (v) => STEER_LO - Math.min(Math.abs(v) / 85, 1) * STEER_DROP;
 
   const DIFFS = {
     easy: { label: 'EASY', pace: 0.88, corner: 0.82, power: 0.955, brake: 0.8, spread: 0.03, boost: 0.03, slow: 0.12 },
@@ -80,6 +89,7 @@
   const touchUI = el('touch-ui');
   const steerPad = el('steer-pad');
   const steerStick = el('steer-stick');
+  const steerZone = el('steer-zone');
   const btnBrake = el('btn-brake');
   const btnAccel = el('btn-accel');
   const overlay = el('overlay');
@@ -554,13 +564,15 @@
     line = { off, k: ks, ksign: kap, v: new Float32Array(N), vp: new Float32Array(N), diff: null };
   }
 
-  // speed profile from the car's own steering limit: v*kappa <= 2.25*(0.52 - 0.3*v/85)*m,
+  // speed profile from the car's own steering limit: v*kappa <= YAW_GAIN*steerLimit(v)*m,
   // then a backward pass so every corner gets a proper braking point.
   function computeSpeedProfile(dset, target) {
     const N = SAMPLES;
     const v = target || line.v;
     const m = dset.corner;
-    for (let i = 0; i < N; i++) v[i] = Math.min(80, (1.17 * m) / (line.k[i] + 0.00794 * m));
+    const A = YAW_GAIN * STEER_LO * m;
+    const B = (YAW_GAIN * STEER_DROP * m) / 85;
+    for (let i = 0; i < N; i++) v[i] = Math.min(80, A / (line.k[i] + B));
     const aB = 64 * dset.brake;
     for (let pass = 0; pass < 2; pass++) {
       for (let i = N - 1; i >= 0; i--) {
@@ -944,7 +956,220 @@
         x: p.x, y: p.y + 1.2, z: p.z, sx: 4, sy: 3, sz: 4, ry: srand() * 3, color: hutCols[(srand() * 4) | 0],
       }));
       G.add(instanced(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), huts));
+    } else if (kind === 'jungle') {
+      buildJungle(G, th, cx0, cz0);
+    } else if (kind === 'moon') {
+      buildMoon(G, th, cx0, cz0);
     }
+  }
+
+  // 3.0: falling particles (snow / leaves) around the camera
+  function addParticles(G, n, color, size, opacity, kind) {
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = rand(-60, 60);
+      pos[i * 3 + 1] = rand(0, 40);
+      pos[i * 3 + 2] = rand(-60, 60);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity, depthWrite: false }));
+    pts.frustumCulled = false;
+    G.add(pts);
+    weather = { pts, pos, n, kind };
+  }
+
+  function addStars(G, cx0, cz0, n) {
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU;
+      const e = Math.random() * 1.3 + 0.06;
+      pos[i * 3] = cx0 + Math.cos(a) * Math.cos(e) * 900;
+      pos[i * 3 + 1] = Math.sin(e) * 900;
+      pos[i * 3 + 2] = cz0 + Math.sin(a) * Math.cos(e) * 900;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const stars = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false }));
+    stars.frustumCulled = false;
+    G.add(stars);
+  }
+
+  // 3.0 JUNGLE TEMPLE scenery: rainforest hills, broadleaf trees, stepped temples, a waterfall
+  function buildJungle(G, th, cx0, cz0) {
+    G.add(
+      buildTerrain(Object.assign({ terrainHigh: 0x2a6a2a, rock: 0x5a6a4a, bankSlope: 0.3 }, th), (x, z, d) => {
+        const m = clamp((d - 50) / 140, 0, 1);
+        const n = Math.sin(x * 0.013 + 0.7) * Math.cos(z * 0.016) + Math.sin(x * 0.027 - z * 0.019) * 0.45 + 0.8;
+        return Math.max(0, n * 42 * m);
+      })
+    );
+    // broadleaf canopy trees: tall trunks, two lumpy crowns
+    const trunks = [];
+    const crowns = [];
+    const greens = [0x1f6a2a, 0x2f8a36, 0x3f9a3a, 0x1a5a30, 0x4aa040];
+    scatter(isTouch ? 150 : 230, WALL_DIST + 3, WALL_DIST + 46, 2).forEach((p) => {
+      const h = srnd(7, 14);
+      trunks.push({ x: p.x, y: p.y + h / 2 - 0.7, z: p.z, sx: srnd(0.8, 1.3), sy: h, sz: 1 });
+      const r = srnd(3, 5.5);
+      crowns.push({ x: p.x, y: p.y + h - 0.2, z: p.z, sx: r, sy: r * 0.62, sz: r, color: greens[(srand() * greens.length) | 0] });
+      if (srand() < 0.6) crowns.push({ x: p.x + srnd(-1.5, 1.5), y: p.y + h - 1.8, z: p.z + srnd(-1.5, 1.5), sx: r * 0.75, sy: r * 0.5, sz: r * 0.75, color: greens[(srand() * greens.length) | 0] });
+    });
+    G.add(instanced(new THREE.CylinderGeometry(0.3, 0.45, 1, 6), new THREE.MeshLambertMaterial({ color: 0x5a4028 }), trunks, { cast: true }));
+    G.add(instanced(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), crowns, { cast: true }));
+    // big leafy ferns along the run-off
+    const ferns = scatter(140, WALL_DIST + 1.5, WALL_DIST + 10, 1).map((p) => ({
+      x: p.x, y: p.y - 0.3, z: p.z, sx: srnd(1.2, 2.4), sy: srnd(0.8, 1.6), sz: srnd(1.2, 2.4), ry: srand() * 6, color: greens[(srand() * greens.length) | 0],
+    }));
+    G.add(instanced(new THREE.ConeGeometry(1, 1.2, 5), new THREE.MeshLambertMaterial({ color: 0xffffff }), ferns));
+    // stepped stone temples (Mayan style), some near the track, a few huge ones in the distance
+    const steps = [];
+    const tops = [];
+    const stone = [0x9a9a7a, 0x8a8c70, 0xa8a488];
+    const temple = (x, y, z, w, n, ry) => {
+      const stepH = w * 0.12;
+      for (let k = 0; k < n; k++) {
+        const ww = w * (1 - k / (n + 1));
+        steps.push({ x, y: y + stepH * (k + 0.5) - 0.6, z, sx: ww, sy: stepH, sz: ww, ry, color: stone[(srand() * 3) | 0] });
+      }
+      tops.push({ x, y: y + stepH * n + stepH * 0.7 - 0.6, z, sx: w * 0.22, sy: stepH * 1.4, sz: w * 0.22, ry });
+    };
+    scatter(7, WALL_DIST + 26, WALL_DIST + 60, 22).forEach((p) => temple(p.x, p.y, p.z, srnd(18, 28), 5, srand() * 3));
+    for (let i = 0; i < 5; i++) {
+      const a = srand() * TAU;
+      const r = srnd(380, 520);
+      temple(cx0 + Math.cos(a) * r, 0, cz0 + Math.sin(a) * r, srnd(50, 80), 6, srand() * 3);
+    }
+    G.add(instanced(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), steps, { cast: true, receive: true }));
+    G.add(instanced(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x6a5a3a }), tops));
+    // waterfall over a cliff beside the first long run, with a pool
+    {
+      const s = sampleAt(Math.round(SAMPLES * 0.3));
+      const side = 1;
+      const d = WALL_DIST + 34;
+      const x = s.x + s.nx * d * side, z = s.z + s.nz * d * side;
+      const cliff = new THREE.Mesh(new THREE.BoxGeometry(40, 30, 14), new THREE.MeshLambertMaterial({ color: 0x5a6250 }));
+      cliff.position.set(x + s.nx * 8, s.y + 14, z + s.nz * 8);
+      cliff.rotation.y = Math.atan2(s.tx, s.tz);
+      const fall = new THREE.Mesh(new THREE.PlaneGeometry(9, 28), new THREE.MeshBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0.85 }));
+      fall.position.set(x + s.nx * 0.8, s.y + 14, z + s.nz * 0.8);
+      fall.rotation.y = Math.atan2(-s.nx, -s.nz);
+      const poolGeo = new THREE.CircleGeometry(11, 20);
+      poolGeo.rotateX(-Math.PI / 2);
+      const pool = new THREE.Mesh(poolGeo, new THREE.MeshStandardMaterial({ color: 0x3a9ac2, roughness: 0.2, metalness: 0.3 }));
+      pool.position.set(x - s.nx * 5, s.y + 0.1, z - s.nz * 5);
+      G.add(cliff, fall, pool);
+    }
+    addParticles(G, isTouch ? 160 : 300, 0x7fd06a, 0.5, 0.9, 'leaves');
+  }
+
+  // 3.0 LUNAR BASE scenery: grey cratered plains, domes, antennas, a rocket, Earth and stars
+  function buildMoon(G, th, cx0, cz0) {
+    const craters = [];
+    for (let i = 0; i < 26; i++) {
+      const a = srand() * TAU;
+      const r = srnd(140, 520);
+      craters.push({ x: cx0 + Math.cos(a) * r, z: cz0 + Math.sin(a) * r, r: srnd(25, 70) });
+    }
+    G.add(
+      buildTerrain(Object.assign({ terrainHigh: 0xa4a7ae, rock: 0x55575e, bankSlope: 0.2 }, th), (x, z, d) => {
+        let h = d > 60 ? (Math.sin(x * 0.008) * Math.cos(z * 0.01) + 0.9) * 16 * clamp((d - 60) / 200, 0, 1) : 0;
+        // craters fade out near the circuit so a rim never pokes up through the road
+        const fade = clamp((d - 45) / 70, 0, 1);
+        if (fade > 0) {
+          for (const c of craters) {
+            const q = Math.hypot(x - c.x, z - c.z) / c.r;
+            if (q < 1.35) h += fade * (q < 1 ? (q * q - 1) * c.r * 0.22 + c.r * 0.08 : ((1.35 - q) / 0.35) * c.r * 0.08);
+          }
+        }
+        return Math.max(-8, h);
+      })
+    );
+    // small craters near the track: rim rings
+    const rims = scatter(40, WALL_DIST + 6, WALL_DIST + 50, 6).map((p) => {
+      const r = srnd(3, 9);
+      return { x: p.x, y: p.y - 0.4, z: p.z, sx: r, sy: r, sz: r * 0.6, rx: -Math.PI / 2 };
+    });
+    G.add(instanced(new THREE.TorusGeometry(1, 0.22, 6, 18), new THREE.MeshLambertMaterial({ color: 0x8d9097 }), rims));
+    const rocks = scatter(90, WALL_DIST + 2, WALL_DIST + 60, 1).map((p) => ({
+      x: p.x, y: p.y - 0.4, z: p.z, sx: srnd(0.6, 2.2), sy: srnd(0.5, 1.4), sz: srnd(0.6, 2.2), ry: srand() * 3,
+    }));
+    G.add(instanced(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0x70737a }), rocks));
+    // base: glowing domes linked by tubes, antenna masts
+    const domes = [];
+    const rings = [];
+    scatter(12, WALL_DIST + 14, WALL_DIST + 45, 12).forEach((p) => {
+      const r = srnd(5, 11);
+      domes.push({ x: p.x, y: p.y - 0.6, z: p.z, sx: r, sy: r * 0.8, sz: r });
+      rings.push({ x: p.x, y: p.y - 0.3, z: p.z, sx: r * 1.02, sy: r * 1.02, sz: r * 1.02, rx: -Math.PI / 2 });
+    });
+    G.add(instanced(new THREE.SphereGeometry(1, 18, 10, 0, TAU, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xe8f0ff, roughness: 0.25, metalness: 0.4, emissive: 0x18306a }), domes, { cast: true }));
+    G.add(instanced(new THREE.TorusGeometry(1, 0.06, 6, 24), new THREE.MeshBasicMaterial({ color: 0x3a7bff }), rings));
+    const masts = [];
+    const tips = [];
+    scatter(14, WALL_DIST + 8, WALL_DIST + 40, 6).forEach((p) => {
+      const h = srnd(10, 22);
+      masts.push({ x: p.x, y: p.y + h / 2 - 0.6, z: p.z, sy: h });
+      tips.push({ x: p.x, y: p.y + h - 0.4, z: p.z });
+    });
+    G.add(instanced(new THREE.CylinderGeometry(0.15, 0.3, 1, 5), new THREE.MeshLambertMaterial({ color: 0xc8ccd6 }), masts));
+    G.add(instanced(new THREE.SphereGeometry(0.55, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3a3a }), tips));
+    // a rocket on its launch pad
+    {
+      const s = sampleAt(Math.round(SAMPLES * 0.55));
+      const d = WALL_DIST + 30;
+      const x = s.x - s.nx * d, z = s.z - s.nz * d;
+      const R = new THREE.Group();
+      const white = new THREE.MeshStandardMaterial({ color: 0xf4f6fa, roughness: 0.4, metalness: 0.2 });
+      const red = new THREE.MeshStandardMaterial({ color: 0xe0302a, roughness: 0.5 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 22, 14), white);
+      body.position.y = 13;
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(2.2, 6, 14), red);
+      nose.position.y = 27;
+      R.add(body, nose);
+      for (let k = 0; k < 4; k++) {
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 6, 3.4), red);
+        const a = (k / 4) * TAU;
+        fin.position.set(Math.cos(a) * 2.6, 4, Math.sin(a) * 2.6);
+        fin.rotation.y = -a;
+        R.add(fin);
+      }
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 8, 1.2, 16), new THREE.MeshLambertMaterial({ color: 0x55585f }));
+      pad.position.y = 0.2;
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(1.6, 26, 1.6), new THREE.MeshLambertMaterial({ color: 0xd8a020 }));
+      tower.position.set(5, 13, 0);
+      R.add(pad, tower);
+      R.position.set(x, s.y - 0.6, z);
+      body.castShadow = true;
+      G.add(R);
+    }
+    addStars(G, cx0, cz0, 900);
+    // Earth hanging in the black sky
+    {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 64;
+      const g = c.getContext('2d');
+      g.fillStyle = '#1f5fbf';
+      g.fillRect(0, 0, 128, 64);
+      for (let i = 0; i < 26; i++) {
+        g.fillStyle = srand() < 0.6 ? '#3f9a4a' : '#c8b070';
+        g.beginPath();
+        g.ellipse(srand() * 128, 10 + srand() * 44, srnd(4, 14), srnd(3, 9), srand() * 3, 0, TAU);
+        g.fill();
+      }
+      g.fillStyle = 'rgba(255,255,255,0.75)';
+      for (let i = 0; i < 30; i++) g.fillRect(srand() * 128, srand() * 64, srnd(6, 20), 2);
+      const earth = new THREE.Mesh(new THREE.SphereGeometry(60, 32, 20), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), fog: false }));
+      earth.position.set(cx0 - 420, 330, cz0 + 700);
+      earth.rotation.z = 0.4;
+      G.add(earth);
+      const glow = new THREE.Mesh(new THREE.CircleGeometry(68, 32), new THREE.MeshBasicMaterial({ color: 0x5aa0ff, transparent: true, opacity: 0.25, fog: false, depthWrite: false }));
+      glow.position.copy(earth.position).add(new THREE.Vector3(0, 0, 8));
+      glow.lookAt(cx0, 0, cz0);
+      G.add(glow);
+    }
+    addLamps(G, 10, 0xbfe0ff, true);
   }
 
   function addTrees(G, count, leafColor, snowy) {
@@ -996,13 +1221,14 @@
   }
 
   function updateWeather(dt) {
-    if (!weather || weather.kind !== 'snow') return;
+    if (!weather) return;
     const p = weather.pos;
+    const fall = weather.kind === 'leaves' ? 1.6 : 4;
     const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
     for (let i = 0; i < weather.n; i++) {
       let x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2];
-      y -= dt * 4;
-      x += Math.sin(y * 0.3 + i) * dt * 0.8;
+      y -= dt * fall;
+      x += Math.sin(y * 0.3 + i) * dt * (weather.kind === 'leaves' ? 2.2 : 0.8);
       if (y < cy - 12) y += 40;
       if (y > cy + 30) y -= 40;
       if (x < cx - 60) x += 120;
@@ -1285,48 +1511,146 @@
   });
 
   function readInput() {
-    let th = 0, br = 0, st = 0, hb = 0;
+    // test hook: drive the car through the same input mapping a thumb / key press would use
+    const ti = window.__gridTestInput;
+    if (ti) {
+      const st = ti.px != null ? touchSteerFromPx(ti.px) : ti.st || 0;
+      return { th: clamp(ti.th || 0, 0, 1), br: clamp(ti.br || 0, 0, 1), st: clamp(st, -1, 1), hb: 0, touch: ti.px != null, key: ti.key };
+    }
+    let th = 0, br = 0, st = 0, hb = 0, usedTouch = false;
     if (keys.KeyW || keys.ArrowUp) th = 1;
     if (keys.KeyS || keys.ArrowDown || keys.Space) br = 1;
     if (keys.KeyA || keys.ArrowLeft) st -= 1;
     if (keys.KeyD || keys.ArrowRight) st += 1;
     if (keys.ShiftLeft || keys.ShiftRight) hb = 1;
+    const key = st !== 0;
     if (isTouch) {
       th = Math.max(th, touch.accel);
       br = Math.max(br, touch.brake);
-      if (touch.pointerId != null || touch.steer !== 0) st = touch.steer;
+      if (touch.pointerId != null || touch.steer !== 0) {
+        st = touch.steer;
+        usedTouch = true;
+      }
     }
-    return { th: clamp(th, 0, 1), br: clamp(br, 0, 1), st: clamp(st, -1, 1), hb };
+    return { th: clamp(th, 0, 1), br: clamp(br, 0, 1), st: clamp(st, -1, 1), hb, touch: usedTouch, key: key && !usedTouch };
   }
 
-  function onSteer(e) {
+  // 3.0 thumb stick. The old 130 px pad needed a drag right to its rim (65 px) for full lock, a
+  // thumb that landed outside the small circle did nothing, and the curve was soft at the start.
+  // Now the whole lower-left of the screen is the steering zone, the stick appears under the
+  // thumb, and full lock is a 46 px slide with a near-linear response.
+  const STICK_FULL = 46; // px of horizontal travel for full lock
+  const STICK_DEAD = 3; // px dead zone (just absorbs a resting thumb)
+  function touchSteerFromPx(px) {
+    const a = Math.abs(px);
+    if (a <= STICK_DEAD) return 0;
+    const n = Math.min(1, (a - STICK_DEAD) / (STICK_FULL - STICK_DEAD));
+    return Math.sign(px) * Math.pow(n, 1.1);
+  }
+  const stick = { ox: 0, oy: 0, home: true };
+  function padCentre() {
     const r = steerPad.getBoundingClientRect();
-    const dx = (e.clientX - (r.left + r.width / 2)) / (r.width * 0.5);
-    const dy = (e.clientY - (r.top + r.height / 2)) / (r.height * 0.5);
-    const m = Math.hypot(dx, dy) || 1;
-    const cx = clamp(dx / Math.max(1, m), -1, 1);
-    const cy = clamp(dy / Math.max(1, m), -1, 1);
-    // small dead zone + gentle response curve: finer corrections on a phone
-    const ax = Math.min(1, Math.abs(dx));
-    const v = ax < 0.06 ? 0 : (ax - 0.06) / 0.94;
-    touch.steer = Math.sign(dx) * Math.pow(v, 1.2);
-    steerStick.style.transform = 'translate(' + cx * 38 + 'px,' + cy * 38 + 'px)';
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 };
+  }
+  function onSteer(e) {
+    const dx = e.clientX - stick.ox;
+    const dy = e.clientY - stick.oy;
+    touch.steer = touchSteerFromPx(dx);
+    const vis = 40;
+    const m = Math.hypot(dx, dy);
+    const k = m > vis ? vis / m : 1;
+    steerStick.style.transform = 'translate(' + dx * k + 'px,' + dy * k * 0.5 + 'px)';
   }
   function endSteer() {
     touch.steer = 0;
     touch.pointerId = null;
     steerStick.style.transform = 'translate(0,0)';
+    steerPad.style.transform = '';
+    steerPad.classList.remove('active');
   }
-  steerPad.addEventListener('pointerdown', (e) => {
-    steerPad.setPointerCapture(e.pointerId);
+  steerZone.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (touch.pointerId != null && touch.pointerId !== e.pointerId) return;
+    try {
+      steerZone.setPointerCapture(e.pointerId);
+    } catch (err) {}
     touch.pointerId = e.pointerId;
+    // touching the drawn pad steers from its centre (like 2.0); anywhere else the pad jumps to the thumb
+    const c = padCentre();
+    if (Math.hypot(e.clientX - c.x, e.clientY - c.y) <= c.r) {
+      stick.ox = c.x;
+      stick.oy = c.y;
+    } else {
+      stick.ox = e.clientX;
+      stick.oy = e.clientY;
+      steerPad.style.transform = 'translate(' + (e.clientX - c.x) + 'px,' + (e.clientY - c.y) + 'px)';
+    }
+    steerPad.classList.add('active');
     onSteer(e);
   });
-  steerPad.addEventListener('pointermove', (e) => {
+  steerZone.addEventListener('pointermove', (e) => {
     if (touch.pointerId === e.pointerId) onSteer(e);
   });
-  steerPad.addEventListener('pointerup', endSteer);
-  steerPad.addEventListener('pointercancel', endSteer);
+  const zoneUp = (e) => {
+    if (touch.pointerId === e.pointerId) endSteer();
+  };
+  steerZone.addEventListener('pointerup', zoneUp);
+  steerZone.addEventListener('pointercancel', zoneUp);
+  steerZone.addEventListener('lostpointercapture', zoneUp);
+
+  // keyboard: digital keys ramp in over ~0.13 s so a tap is a small correction, a hold is full lock
+  let keySteer = 0;
+  function rampKeySteer(target, dt) {
+    const rate = target === 0 || Math.sign(target) !== Math.sign(keySteer) ? 11 : 7.5;
+    const d = target - keySteer;
+    keySteer += clamp(d, -rate * dt, rate * dt);
+    return keySteer;
+  }
+
+  // STEER ASSIST (default on for touch): blends a little of a racing-line follower into the
+  // player's input, leans harder only when the car is about to run onto the run-off, and lifts
+  // the throttle when the car is far too fast for the next corner. It never brakes hard or
+  // steers against a big input, so you are still driving.
+  function assistInput(car, inp, dt) {
+    const N = SAMPLES;
+    const v = Math.max(0, car.speed);
+    if (v < 4) return inp;
+    const look = 8 + v * 0.32;
+    const li = (car.idx + Math.max(2, Math.round(look / DS))) % N;
+    const ls = samples[li];
+    const lim = TRACK_HALF - 1.6;
+    // aim between the racing line and wherever the player is, so it helps but does not take over
+    const off = clamp(lerp(line.off[li], clamp(car.lat, -lim, lim), 0.5), -lim, lim);
+    const dx = ls.x + ls.nx * off - car.x;
+    const dz = ls.z + ls.nz * off - car.z;
+    const Ld = Math.hypot(dx, dz) || 1;
+    const alpha = wrapAng(Math.atan2(dx, dz) - car.yaw);
+    const omega = (2 * Math.max(v, 8) * Math.sin(alpha)) / Ld;
+    const maxSteer = steerLimit(v) * Math.max(0.4, 1 - car.damage * 0.0048);
+    const auto = clamp(omega / (YAW_GAIN * maxSteer), -1, 1);
+    // where is the car heading? lateral position 0.45 s from now
+    const s = sampleAt(car.idx);
+    const latNext = car.lat + v * 0.45 * (Math.sin(car.yaw) * s.nx + Math.cos(car.yaw) * s.nz);
+    const over = Math.abs(latNext) - (TRACK_HALF + 0.4);
+    // never fights the player: with the thumb near centre it keeps a gentle line; when steering it
+    // only adds lock if the corner needs more than you gave; it pulls harder only when the car is
+    // about to run onto the run-off.
+    let st = inp.st;
+    if (Math.abs(inp.st) < 0.15) st = inp.st + (auto - inp.st) * 0.3 * (1 - Math.abs(inp.st) / 0.15);
+    else if (Math.sign(auto) === Math.sign(inp.st) && Math.abs(auto) > Math.abs(inp.st)) st = inp.st + (auto - inp.st) * 0.35;
+    if (over > 0) st += (auto - st) * Math.min(0.6, over * 0.15);
+    // corner lift / dab of brake when far too fast for what is coming
+    let th = inp.th, br = inp.br;
+    const reach = Math.max(2, Math.round((v * 0.9) / DS));
+    let vt = Infinity;
+    for (let k = 1; k <= reach; k++) vt = Math.min(vt, line.vp[(car.idx + k) % N]);
+    vt *= 1 - car.damage * 0.004;
+    if (th > 0 && br === 0) {
+      if (v > vt + 1.5) th = Math.min(th, 0.15);
+      if (v > vt + 5) br = Math.max(br, clamp((v - vt - 5) / 10, 0.2, 0.6));
+    }
+    return { th, br, st: clamp(st, -1, 1), hb: inp.hb, touch: inp.touch, key: inp.key };
+  }
 
   function holdBtn(btn, key) {
     const down = (e) => {
@@ -1375,6 +1699,7 @@
   settings.laps = +settings.laps;
   if (![1, 3, 5].includes(settings.laps)) settings.laps = 3;
   if (!TRACKS.some((t) => t.id === settings.track)) settings.track = 'park';
+  if (typeof settings.assist !== 'boolean') settings.assist = isTouch; // phones get steering assist
   function saveSettings() {
     lsSet(LS_SET, JSON.stringify(settings));
   }
@@ -1622,8 +1947,8 @@
     const Ld = Math.hypot(dx, dz) || 1;
     const alpha = wrapAng(Math.atan2(dx, dz) - car.yaw);
     const omega = (2 * Math.max(v, 8) * Math.sin(alpha)) / Ld;
-    const maxSteer = (0.52 - Math.min(v / 85, 1) * 0.3) * Math.max(0.4, 1 - car.damage * 0.0048);
-    car.steer = v < 9 ? clamp(alpha * 2.5, -1, 1) : clamp(omega / (2.25 * maxSteer), -1, 1);
+    const maxSteer = steerLimit(v) * Math.max(0.4, 1 - car.damage * 0.0048);
+    car.steer = v < 9 ? clamp(alpha * 2.5, -1, 1) : clamp(omega / (YAW_GAIN * maxSteer), -1, 1);
 
     // speed: braking-point profile a little ahead
     const reach = Math.max(1, Math.round((v * 0.18) / DS) + 1);
@@ -1669,7 +1994,7 @@
     if (onCurb) grip *= 0.75;
     if (car.handbrake) grip *= 0.35;
 
-    const maxSteer = (0.52 - Math.min(Math.abs(car.speed) / 85, 1) * 0.3) * dmgSteer;
+    const maxSteer = steerLimit(car.speed) * dmgSteer;
     const steerTgt = canDrive ? car.steer * maxSteer : 0;
     car.steerVis = lerp(car.steerVis, steerTgt, Math.min(1, 16 * dt));
 
@@ -1702,7 +2027,7 @@
     }
 
     const speedFactor = Math.min(1, Math.abs(car.speed) / 9);
-    const turn = car.steerVis * speedFactor * 2.25 * grip;
+    const turn = car.steerVis * speedFactor * YAW_GAIN * grip;
     car.yaw = wrapAng(car.yaw + turn * dt);
 
     car.x += Math.sin(car.yaw) * car.speed * dt;
@@ -2069,6 +2394,7 @@
   }
   segInit('seg-diff', 'diff', (v) => v);
   segInit('seg-laps', 'laps', (v) => +v);
+  segInit('seg-assist', 'assist', (v) => v === 'true');
 
   const trackList = el('track-list');
   const trackDesc = el('track-desc');
@@ -2437,7 +2763,10 @@
       if (state.autopilot && racing) {
         updateAI(player, dt, DIFFS.pilot);
       } else {
-        const inp = readInput();
+        let inp = readInput();
+        if (inp.key || (!inp.touch && keySteer !== 0)) inp.st = rampKeySteer(inp.st, dt);
+        else keySteer = 0;
+        if (racing && settings.assist && line && line.vp) inp = assistInput(player, inp, dt);
         player.throttle = inp.th;
         player.brake = racing ? inp.br : 0;
         player.steer = racing ? inp.st : inp.st * 0.35;

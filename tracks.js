@@ -1,6 +1,6 @@
 'use strict';
 
-/* GROK GRID 2.0 — track library.
+/* GROK GRID 3.0 — track library.
  * Each track: layout (either Catmull-Rom control points `pts`, or a polygon `poly` with
  * per-corner fillet radii), road widths, elevation profile and a visual theme.
  * Pure data + one helper, no THREE dependency, so tests can load it in node. */
@@ -241,6 +241,61 @@
         curb: [0xff2d2d, 0xf4f7ff], line: 0xf0e6a8,
         mini: '#e3cc96',
         sea: 0x2a86c2,
+      },
+    },
+    {
+      id: 'jungle',
+      name: 'JUNGLE TEMPLE',
+      sub: 'NEW in 3.0 \u2014 rainforest esses past ancient stone temples, mist and a waterfall.',
+      tag: 'NEW · JUNGLE',
+      half: 7.8,
+      wall: 12.5,
+      scale: 1.0,
+      poly: [
+        [280, 0], [400, 40], [440, 150], [360, 210], [400, 300], [300, 380], [150, 340],
+        [90, 240], [-10, 300], [-150, 280], [-200, 160], [-120, 90], [-190, 10], [-100, -50],
+      ],
+      radii: [60, 50, 40, 40, 50, 55, 45, 36, 40, 55, 40, 36, 40, 50],
+      elev: { a: [[6, 2, 0.3], [3, 3, 1.0]], base: 9 },
+      theme: {
+        scenery: 'jungle',
+        sky: 0x9fc9a8, fog: 0xa9cdb0, fogNear: 60, fogFar: 380,
+        hemiSky: 0xe0ffe4, hemiGround: 0x2a4a22, hemiI: 0.68,
+        sunColor: 0xfff2c8, sunI: 0.9, sunDir: [60, 170, 100], ambient: 0.26,
+        ground: '#2f6a2a', groundTint: 0x3f8a36,
+        runoff: '#7a5a3a', runoffTint: 0x8a6a46,
+        asphalt: '#2c2e30', asphaltTint: 0x969a9e,
+        walls: [0x2f8a3a, 0xf4d23a, 0x2f8a3a, 0xf4f4f0], wallH: 1.25,
+        curb: [0x2fbf4a, 0xf4f7ff], line: 0xf0e6a8,
+        mini: '#3f8a36',
+      },
+    },
+    {
+      id: 'moon',
+      name: 'LUNAR BASE',
+      sub: 'NEW in 3.0 \u2014 race across the Moon: long straights, tight crater hairpins, Earth overhead.',
+      tag: 'NEW · MOON',
+      half: 8.0,
+      wall: 13.5,
+      scale: 1.0,
+      poly: [
+        [320, 0], [560, 0], [600, 90], [540, 170], [420, 170], [360, 240], [400, 330],
+        [300, 400], [160, 330], [40, 400], [-90, 330], [-60, 200], [-150, 120], [-110, 10],
+      ],
+      radii: [60, 34, 40, 36, 34, 40, 36, 36, 40, 36, 40, 50, 40, 50],
+      elev: { a: [[3, 1, 2.2], [1.5, 3, 0.4]], base: 4 },
+      theme: {
+        scenery: 'moon',
+        night: true,
+        sky: 0x02030a, fog: 0x05070f, fogNear: 160, fogFar: 640,
+        hemiSky: 0xbcc8e8, hemiGround: 0x30323a, hemiI: 0.42,
+        sunColor: 0xfff8ee, sunI: 0.8, sunDir: [-160, 110, 80], ambient: 0.16,
+        ground: '#7a7c82', groundTint: 0x7d8087,
+        runoff: '#5e6068', runoffTint: 0x6a6d75,
+        asphalt: '#26282e', asphaltTint: 0x8a8e98,
+        walls: [0x9aa6bc, 0x2f6af0], wallH: 1.25, wallGlow: true,
+        curb: [0x3a7bff, 0xf4f7ff], line: 0x9ff6ff,
+        mini: '#80838b',
       },
     },
   ];

@@ -1,7 +1,33 @@
-GROK GRID 2.0
+GROK GRID 3.0
 =============
 
-Arcade open-wheel racer. 6 tracks, 5 cars, walls that hurt.
+Arcade open-wheel racer. 8 tracks, 5 cars, walls that hurt.
+
+What's new in 3.0
+-----------------
+- Steering rebuilt. In 2.0 the car lost most of its steering as speed rose
+  (about 29 deg/s of turn flat out, a 150 m turning circle), so many corners
+  were physically impossible without heavy braking and phone players hit
+  the walls. 3.0 keeps roughly twice the steering at speed (~56 deg/s flat
+  out, ~80 m circle; ~74 deg/s at low speed). AI rivals use the same car
+  model, so races stay fair.
+- Phone steering: the whole lower-left of the screen is the steering zone.
+  Put your thumb down anywhere there and the stick appears under it; full
+  lock is a short 46 px slide (2.0 needed the full 65 px pad radius, and a
+  thumb that missed the small pad did nothing).
+- Keyboard: steering keys ramp in over ~0.13 s, so taps are small
+  corrections and a hold is full lock.
+- STEER ASSIST (ON by default on phones, OFF on desktop, switch on the
+  title screen): blends in a little help toward a clean line, helps more
+  when you are about to run wide, and lifts the throttle if you arrive at a
+  corner far too fast.
+- Wall crashes are unchanged: hit a wall and you still take the damage.
+- Two new tracks:
+    JUNGLE TEMPLE  rainforest esses, stepped stone temples, waterfall,
+                   falling leaves, rolling hills
+    LUNAR BASE     on the Moon: long straights, tight crater hairpins,
+                   domes, a rocket on its pad, Earth in a black sky
+- Championship is now 8 rounds.
 
 What's new in 2.0
 -----------------
@@ -20,7 +46,7 @@ What's new in 2.0
 - LAPS: 1 / 3 / 5.
 - Best lap per track and best race time per track/lap count are saved in
   your browser (localStorage).
-- CHAMPIONSHIP: all six tracks in a row, points 10-6-4-2-1. A DNF scores
+- CHAMPIONSHIP: every track in a row, points 10-6-4-2-1. A DNF scores
   nothing. You can leave and continue the season later.
 - Pause button (or Esc / P). The game also pauses if you switch apps.
 - Phone: landscape layout tuned, steering has a small dead zone, and the
@@ -42,7 +68,7 @@ Desktop:  W / ↑ accelerate
           S / ↓ / Space  brake
           A D or arrows  steer
           Shift          handbrake
-Mobile:   left stick to steer, ACCEL / BRAKE on the right
+Mobile:   slide a thumb on the left half to steer, ACCEL / BRAKE on the right
 ♪ button  mute engine and impacts
 II button pause (Esc / P on desktop)
 

@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#070b14" />
-  <title>GROK GRID 2.0</title>
+  <title>GROK GRID 3.0</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23070b14'/%3E%3Cpath d='M8 40 L28 16 L36 16 L20 40 Z' fill='%23ff4a1c'/%3E%3Cpath d='M28 40 L48 16 L56 16 L40 40 Z' fill='%2300e8ff'/%3E%3Crect x='8' y='44' width='48' height='8' fill='%23ffe14a'/%3E%3C/svg%3E" />
 </head>
@@ -58,6 +58,7 @@
   <button id="mute" type="button" aria-label="Toggle sound" title="Sound">♪</button>
 
   <div id="touch-ui" class="hidden" aria-hidden="true">
+    <div id="steer-zone"></div>
     <div id="steer-pad">
       <div id="steer-stick"></div>
     </div>
@@ -73,8 +74,8 @@
     <div class="card" id="title-card">
       <div class="stripe" aria-hidden="true"></div>
       <p class="kicker">OPEN WHEEL · OPEN THROTTLE</p>
-      <h1>GROK<br>GRID <span class="v2">2.0</span></h1>
-      <p class="tag">6 TRACKS · SMARTER RIVALS · CHAMPIONSHIP</p>
+      <h1>GROK<br>GRID <span class="v2">3.0</span></h1>
+      <p class="tag">8 TRACKS · FREE STEERING · CHAMPIONSHIP</p>
       <p class="blurb">Stick it to the asphalt. Slide it if you must. Hit a wall and the car will tell you — wings fold, smoke pours, and a big enough crash is a DNF.</p>
       <div class="opt-row">
         <span class="opt-label">RIVALS</span>
@@ -92,6 +93,13 @@
           <button type="button" data-v="5">5</button>
         </div>
       </div>
+      <div class="opt-row">
+        <span class="opt-label">ASSIST</span>
+        <div class="seg" id="seg-assist">
+          <button type="button" data-v="true">ON</button>
+          <button type="button" data-v="false">OFF</button>
+        </div>
+      </div>
       <div class="btn-row">
         <button id="play-btn" type="button" class="btn primary">QUICK RACE</button>
         <button id="champ-btn" type="button" class="btn ghost">CHAMPIONSHIP</button>
@@ -99,7 +107,7 @@
       <ul class="controls">
         <li><kbd>W</kbd> <kbd>↑</kbd> accelerate &nbsp; <kbd>S</kbd> <kbd>↓</kbd> <kbd>Space</kbd> brake</li>
         <li><kbd>A</kbd> <kbd>D</kbd> or arrows to steer &nbsp; <kbd>Shift</kbd> handbrake &nbsp; <kbd>Esc</kbd> pause</li>
-        <li class="touch-note"><kbd>Steer pad</kbd> left · <kbd>ACCEL</kbd> / <kbd>BRAKE</kbd> right</li>
+        <li class="touch-note"><kbd>Slide a thumb</kbd> anywhere on the left to steer · <kbd>ACCEL</kbd> / <kbd>BRAKE</kbd> right</li>
       </ul>
       <p id="title-best" class="best-line"></p>
     </div>
