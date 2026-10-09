@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* Grok Arcade Hall of Game Records: archived old version 2.0 of grok-grid. Saves are kept separate from the newest version. */
+(function(){var P='grokOldVersion.grok-grid.v2:';try{var S=Storage.prototype,g=S.getItem,s=S.setItem,r=S.removeItem;function L(t){try{return t===window.localStorage;}catch(e){return false;}}
+S.getItem=function(k){return g.call(this,L(this)?P+k:k);};S.setItem=function(k,v){return s.call(this,L(this)?P+k:k,v);};S.removeItem=function(k){return r.call(this,L(this)?P+k:k);};}catch(e){}
+window.GROK_OLD_VERSION={repo:'grok-grid',label:'v2',ver:'2.0',prefix:P};
+function badge(){try{var d=document.createElement('div');d.id='grokOldVerBadge';d.setAttribute('style','position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:2147483647;background:rgba(20,10,43,.92);color:#ffe14d;font:bold 12px/1.3 system-ui,sans-serif;padding:6px 12px;border-radius:14px;border:2px solid #ff4fd8;box-shadow:0 2px 10px rgba(0,0,0,.4);pointer-events:none;transition:opacity .8s;text-align:center;max-width:90vw');d.textContent='\uD83D\uDCFC OLD VERSION 2.0 \u00b7 from the Hall of Game Records \u00b7 separate save';document.body.appendChild(d);setTimeout(function(){d.style.opacity='0';},6000);setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);},7000);}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',badge);else badge();})();</script>
+<meta name="robots" content="noindex">
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#070b14" />
+  <title>GROK GRID 2.0</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23070b14'/%3E%3Cpath d='M8 40 L28 16 L36 16 L20 40 Z' fill='%23ff4a1c'/%3E%3Cpath d='M28 40 L48 16 L56 16 L40 40 Z' fill='%2300e8ff'/%3E%3Crect x='8' y='44' width='48' height='8' fill='%23ffe14a'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <canvas id="minimap" width="200" height="160"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div class="hud-block">
+        <div class="label">LAP</div>
+        <div id="lap">1<span class="dim">/3</span></div>
+      </div>
+      <div class="hud-block">
+        <div class="label">POS</div>
+        <div id="pos">P3<span class="dim">/5</span></div>
+      </div>
+      <div class="hud-block">
+        <div class="label">LAP TIME</div>
+        <div id="laptime">0:00.000</div>
+      </div>
+      <div class="hud-block">
+        <div class="label">BEST</div>
+        <div id="best">—</div>
+      </div>
+    </div>
+
+    <div id="speedo">
+      <div id="speed">0</div>
+      <div class="unit">KM/H</div>
+      <div id="gear">N</div>
+    </div>
+
+    <div id="dmg-wrap">
+      <div class="label">DAMAGE</div>
+      <div id="dmg-bar"><div id="dmg-fill"></div></div>
+      <div id="dmg-txt">CLEAN</div>
+    </div>
+
+    <div id="race-time"></div>
+    <div id="track-name"></div>
+  </div>
+
+  <div id="countdown"></div>
+  <div id="lap-flash"></div>
+  <div id="impact"></div>
+
+  <button id="mute" type="button" aria-label="Toggle sound" title="Sound">♪</button>
+
+  <div id="touch-ui" class="hidden" aria-hidden="true">
+    <div id="steer-pad">
+      <div id="steer-stick"></div>
+    </div>
+    <div id="pedals">
+      <button type="button" id="btn-brake">BRAKE</button>
+      <button type="button" id="btn-accel">ACCEL</button>
+    </div>
+  </div>
+
+  <button id="pause" type="button" class="hidden" aria-label="Pause" title="Pause (Esc)">II</button>
+
+  <div id="overlay" class="show">
+    <div class="card" id="title-card">
+      <div class="stripe" aria-hidden="true"></div>
+      <p class="kicker">OPEN WHEEL · OPEN THROTTLE</p>
+      <h1>GROK<br>GRID <span class="v2">2.0</span></h1>
+      <p class="tag">6 TRACKS · SMARTER RIVALS · CHAMPIONSHIP</p>
+      <p class="blurb">Stick it to the asphalt. Slide it if you must. Hit a wall and the car will tell you — wings fold, smoke pours, and a big enough crash is a DNF.</p>
+      <div class="opt-row">
+        <span class="opt-label">RIVALS</span>
+        <div class="seg" id="seg-diff">
+          <button type="button" data-v="easy">EASY</button>
+          <button type="button" data-v="normal">NORMAL</button>
+          <button type="button" data-v="hard">HARD</button>
+        </div>
+      </div>
+      <div class="opt-row">
+        <span class="opt-label">LAPS</span>
+        <div class="seg" id="seg-laps">
+          <button type="button" data-v="1">1</button>
+          <button type="button" data-v="3">3</button>
+          <button type="button" data-v="5">5</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="play-btn" type="button" class="btn primary">QUICK RACE</button>
+        <button id="champ-btn" type="button" class="btn ghost">CHAMPIONSHIP</button>
+      </div>
+      <ul class="controls">
+        <li><kbd>W</kbd> <kbd>↑</kbd> accelerate &nbsp; <kbd>S</kbd> <kbd>↓</kbd> <kbd>Space</kbd> brake</li>
+        <li><kbd>A</kbd> <kbd>D</kbd> or arrows to steer &nbsp; <kbd>Shift</kbd> handbrake &nbsp; <kbd>Esc</kbd> pause</li>
+        <li class="touch-note"><kbd>Steer pad</kbd> left · <kbd>ACCEL</kbd> / <kbd>BRAKE</kbd> right</li>
+      </ul>
+      <p id="title-best" class="best-line"></p>
+    </div>
+
+    <div class="card wide hidden" id="track-card">
+      <div class="stripe" aria-hidden="true"></div>
+      <p class="kicker">QUICK RACE · <span id="track-opts"></span></p>
+      <h3>SELECT TRACK</h3>
+      <div id="track-list" class="track-list"></div>
+      <p class="track-desc" id="track-desc"></p>
+      <div class="btn-row">
+        <button id="track-go" type="button" class="btn primary">LIGHTS OUT</button>
+        <button id="track-back" type="button" class="btn ghost">BACK</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="champ-card">
+      <div class="stripe" aria-hidden="true"></div>
+      <p class="kicker" id="champ-kicker">GROK GRID CHAMPIONSHIP</p>
+      <h3 id="champ-title">ROUND 1 / 6</h3>
+      <p class="result" id="champ-msg"></p>
+      <table class="standings" id="champ-table"></table>
+      <div class="btn-row">
+        <button id="champ-go" type="button" class="btn primary">START ROUND</button>
+        <button id="champ-quit" type="button" class="btn ghost">QUIT</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="pause-card">
+      <p class="kicker">PIT WALL</p>
+      <h2>PAUSED</h2>
+      <div class="btn-row">
+        <button id="resume-btn" type="button" class="btn primary">RESUME</button>
+        <button id="restart-btn" type="button" class="btn ghost">RESTART</button>
+        <button id="pause-menu-btn" type="button" class="btn ghost">RETIRE</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="finish-card">
+      <p class="kicker" id="finish-kicker">CHEQUERED FLAG</p>
+      <h2 id="finish-title">P2</h2>
+      <p class="result" id="finish-msg">You brought it home.</p>
+      <div class="stats" id="finish-stats"></div>
+      <div class="btn-row">
+        <button id="retry-btn" type="button" class="btn primary">RETRY</button>
+        <button id="finish-menu-btn" type="button" class="btn ghost">MENU</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="dnf-card">
+      <p class="kicker dnf">TERMINAL DAMAGE</p>
+      <h2>DNF</h2>
+      <p class="result" id="dnf-msg">The car is done.</p>
+      <div class="stats" id="dnf-stats"></div>
+      <div class="btn-row">
+        <button id="dnf-retry-btn" type="button" class="btn primary">RETRY</button>
+        <button id="dnf-menu-btn" type="button" class="btn ghost">MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="three.min.js"></script>
+  <script src="tracks.js"></script>
+  <script src="game.js"></script>
+  <script src="peerjs.min.js"></script>
+  <script src="grok-net.js"></script>
+  <script src="grid-online.js"></script>
+</body>
+</html>
