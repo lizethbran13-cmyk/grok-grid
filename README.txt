@@ -3,6 +3,13 @@ GROK GRID 3.0
 
 Arcade open-wheel racer. 8 tracks, 5 cars, walls that hurt.
 
+Controls fix (Suggestion Booth #21)
+-----------------------------------
+- Steering was reversed: pressing right / sliding your thumb right turned
+  the car LEFT on screen (the game's turn direction and the chase camera
+  disagreed about which way is right). Keys and the phone thumb stick now
+  turn the car the way you press. AI rivals and steer assist unchanged.
+
 What's new in 3.0
 -----------------
 - Steering rebuilt. In 2.0 the car lost most of its steering as speed rose
