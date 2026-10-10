@@ -1483,6 +1483,12 @@
   /* ---------- input ---------- */
   const keys = Object.create(null);
   const touch = { steer: 0, accel: 0, brake: 0, pointerId: null };
+  // 3.1 controls fix (Suggestion Booth #21: "controls feel opposite"). In this world a positive
+  // steer raises yaw, which swings the nose toward +x, and with the chase camera looking down the
+  // car's heading +x is the LEFT side of the screen. Keys and the thumb stick used to feed
+  // "right = +1" straight in, so pressing right turned the car left on screen. All player input is
+  // read as a screen direction (right = +1) and converted here, once.
+  const SCREEN_TO_YAW = -1;
 
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -1512,10 +1518,11 @@
 
   function readInput() {
     // test hook: drive the car through the same input mapping a thumb / key press would use
+    // (px / st here are SCREEN directions like a real thumb or key: + = right)
     const ti = window.__gridTestInput;
     if (ti) {
       const st = ti.px != null ? touchSteerFromPx(ti.px) : ti.st || 0;
-      return { th: clamp(ti.th || 0, 0, 1), br: clamp(ti.br || 0, 0, 1), st: clamp(st, -1, 1), hb: 0, touch: ti.px != null, key: ti.key };
+      return { th: clamp(ti.th || 0, 0, 1), br: clamp(ti.br || 0, 0, 1), st: clamp(st, -1, 1) * SCREEN_TO_YAW, hb: 0, touch: ti.px != null, key: ti.key };
     }
     let th = 0, br = 0, st = 0, hb = 0, usedTouch = false;
     if (keys.KeyW || keys.ArrowUp) th = 1;
@@ -1532,7 +1539,7 @@
         usedTouch = true;
       }
     }
-    return { th: clamp(th, 0, 1), br: clamp(br, 0, 1), st: clamp(st, -1, 1), hb, touch: usedTouch, key: key && !usedTouch };
+    return { th: clamp(th, 0, 1), br: clamp(br, 0, 1), st: clamp(st, -1, 1) * SCREEN_TO_YAW, hb, touch: usedTouch, key: key && !usedTouch };
   }
 
   // 3.0 thumb stick. The old 130 px pad needed a drag right to its rim (65 px) for full lock, a
