@@ -27,6 +27,10 @@
   const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
   const { TRACKS, elevAt, controlPoints } = window.GRID_TRACKS;
+  // Super Grid Expansion (supergrid.js): extra tracks, vehicles, items, the hub. Gated by the arcade DLC key.
+  const EXT = window.GRID_EXT || null;
+  const dlcOwned = () => !!(EXT && EXT.owned());
+  const NEUTRAL_VEH = { acc: 1, top: 1, grip: 1, off: 1 };
   const FIELD = 5;
   // online play (grid-online.js): remote cars are driven by the network, not the AI / physics
   const net = () => (window.GridNet && window.GridNet.active ? window.GridNet : null);
@@ -438,6 +442,21 @@
     });
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    // r128 culls an InstancedMesh by its geometry's own (unit) bounds at the origin, which made far
+    // scenery pop in and out. Give it a sphere around all of its instances instead.
+    {
+      if (!geo.boundingSphere) geo.computeBoundingSphere();
+      const gr = geo.boundingSphere.radius;
+      let cx = 0, cy = 0, cz = 0;
+      list.forEach((it) => { cx += it.x; cy += it.y || 0; cz += it.z; });
+      cx /= list.length; cy /= list.length; cz /= list.length;
+      let r = 0;
+      list.forEach((it) => {
+        const sc = Math.max(it.sx || 1, it.sy || it.sx || 1, it.sz || it.sx || 1);
+        r = Math.max(r, Math.hypot(it.x - cx, (it.y || 0) - cy, it.z - cz) + gr * sc);
+      });
+      geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), r);
+    }
     m.castShadow = !!(opts && opts.cast);
     m.receiveShadow = !!(opts && opts.receive);
     return m;
@@ -750,11 +769,13 @@
       new THREE.MeshStandardMaterial({ map: groundMap, color: th.groundTint, roughness: 1 })
     );
     flat.rotation.x = -Math.PI / 2;
-    flat.position.set((minX + maxX) / 2, elevated ? -2 : -0.02, (minZ + maxZ) / 2);
+    flat.position.set((minX + maxX) / 2, th.floorY != null ? th.floorY : elevated ? -2 : -0.02, (minZ + maxZ) / 2);
+    if (th.floorColor != null) flat.material.color.set(th.floorColor);
     flat.receiveShadow = true;
     G.add(flat);
 
     buildScenery(G, th);
+    if (EXT && EXT.onTrackBuilt) EXT.onTrackBuilt(G, track, H);
 
     scene.add(G);
     computeRacingLine();
@@ -960,8 +981,21 @@
       buildJungle(G, th, cx0, cz0);
     } else if (kind === 'moon') {
       buildMoon(G, th, cx0, cz0);
+    } else if (EXT && EXT.scenery && EXT.scenery[kind]) {
+      EXT.scenery[kind](G, th, H, cx0, cz0);
     }
   }
+
+  // helper kit handed to supergrid.js (scenery, items, hub)
+  const H = {
+    THREE, TAU, clamp, lerp, wrapAng, instanced, buildStrip, scatter, buildTerrain, addParticles, addStars, addLamps, addTrees, sampleAt, trackDist, noiseTex, nearestIdx,
+    srand: () => srand(), srnd: (a, b) => srnd(a, b),
+    get samples() { return samples; }, get SAMPLES() { return SAMPLES; }, get DS() { return DS; },
+    get WALL_DIST() { return WALL_DIST; }, get TRACK_HALF() { return TRACK_HALF; }, get TR() { return TR; },
+    get bounds() { return { minX, maxX, minZ, maxZ }; },
+    get isTouch() { return isTouch; },
+    setWeather: (w) => { weather = w; },
+  };
 
   // 3.0: falling particles (snow / leaves) around the camera
   function addParticles(G, n, color, size, opacity, kind) {
@@ -1259,6 +1293,10 @@
   }
 
   function makeCar(spec) {
+    if (EXT && spec.kind && spec.kind !== 'f1') {
+      const v = EXT.makeVehicle(spec, THREE);
+      if (v) return v;
+    }
     const root = new THREE.Group();
     root.rotation.order = 'YXZ';
     const body = new THREE.Group();
@@ -1329,7 +1367,7 @@
       root.add(w);
       wheels.push(w);
     });
-    return { root, body, bodyMat, baseColor: col.clone(), frontWing: fw, rearWing: rw, wheels, fwBaseY: fw.position.y };
+    return { root, body, bodyMat, baseColor: col.clone(), frontWing: fw, rearWing: rw, wheels, fwBaseY: fw.position.y, wheelY: 0.38, kind: 'f1' };
   }
 
   const LIVERY = [
@@ -1355,6 +1393,29 @@
     });
   }
   const player = cars[0];
+
+  // swap a car's model (Super Grid Expansion vehicles). Keeps its paint unless a colour is given, and
+  // carries over anything attached to the old model (online name tags).
+  function setVehicle(car, kind, color) {
+    kind = kind || 'f1';
+    const old = car.vis;
+    const col = color != null ? color : old.baseColor.getHex();
+    if (old.kind === kind && color == null) return false;
+    const base = LIVERY[car.id] || LIVERY[1];
+    const vis = makeCar(Object.assign({}, base, { kind, color: col }));
+    vis.root.position.copy(old.root.position);
+    vis.root.rotation.copy(old.root.rotation);
+    vis.root.visible = old.root.visible;
+    old.root.children.filter((o) => o.isSprite).forEach((o) => vis.root.add(o));
+    scene.remove(old.root);
+    old.root.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    scene.add(vis.root);
+    car.vis = vis;
+    car.veh = EXT && EXT.stats ? EXT.stats(kind) : null;
+    if (car.damage > 0) applyVisualDamage(car);
+    syncCarMesh(car);
+    return true;
+  }
 
   /* ---------- smoke particles ---------- */
   const SMOKE_N = 120;
@@ -1494,7 +1555,7 @@
     keys[e.code] = true;
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     if (e.code === 'Escape' || e.code === 'KeyP') {
-      if (state.mode === 'race' || state.mode === 'countdown') togglePause();
+      if (state.mode === 'race' || state.mode === 'countdown' || state.mode === 'hub') togglePause();
     }
     if (e.code === 'Enter') {
       if (state.paused) togglePause();
@@ -1513,7 +1574,7 @@
     endSteer();
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && state.mode === 'race' && !state.paused) togglePause();
+    if (document.hidden && (state.mode === 'race' || state.mode === 'hub') && !state.paused) togglePause();
   });
 
   function readInput() {
@@ -1705,7 +1766,7 @@
   if (!DIFFS[settings.diff] || settings.diff === 'pilot') settings.diff = 'normal';
   settings.laps = +settings.laps;
   if (![1, 3, 5].includes(settings.laps)) settings.laps = 3;
-  if (!TRACKS.some((t) => t.id === settings.track)) settings.track = 'park';
+  if (!TRACKS.some((t) => t.id === settings.track) || (TRACKS.find((t) => t.id === settings.track).dlc && !dlcOwned())) settings.track = 'park';
   if (typeof settings.assist !== 'boolean') settings.assist = isTouch; // phones get steering assist
   function saveSettings() {
     lsSet(LS_SET, JSON.stringify(settings));
@@ -1752,7 +1813,7 @@
     inChamp: false,
   };
 
-  const champ = { active: false, round: 0, points: [0, 0, 0, 0, 0], diff: null, laps: null, order: TRACKS.map((t) => t.id) };
+  const champ = { active: false, round: 0, points: [0, 0, 0, 0, 0], diff: null, laps: null, order: TRACKS.filter((t) => !t.dlc).map((t) => t.id) };
   (() => {
     try {
       const c = JSON.parse(lsGet(LS_CHAMP) || 'null');
@@ -1786,7 +1847,7 @@
         t: idx / SAMPLES, lastT: idx / SAMPLES, progress: idx / SAMPLES - 1,
         lap: 1, lapTime: 0, bestLap: Infinity, crossedStart: false, finished: false, dnf: false, finishTime: 0,
         throttle: 0, brake: 0, handbrake: 0, steerVis: 0, roll: 0, pitch: 0, stall: 0, impactCd: 0,
-        passOff: 0, lat: off, slope: 0, maxSpd: 78,
+        passOff: 0, lat: off, slope: 0, maxSpd: 78, boostT: 0, shieldT: 0, item: null,
       });
       // AI personality: small spread around the chosen difficulty
       car.skill = car.isPlayer ? 1 : 1 + skillTab[car.id] * dset.spread * 1.6;
@@ -1798,7 +1859,7 @@
       vis.frontWing.rotation.set(0, 0, 0);
       vis.rearWing.rotation.set(0, 0, 0);
       vis.frontWing.position.y = vis.fwBaseY;
-      vis.wheels[0].position.y = 0.38;
+      vis.wheels[0].position.y = vis.wheelY;
       vis.bodyMat.color.copy(vis.baseColor);
       vis.bodyMat.roughness = 0.38;
       syncCarMesh(car);
@@ -1833,7 +1894,7 @@
     const dark = 1 - d * 0.0045;
     vis.bodyMat.color.copy(vis.baseColor).multiplyScalar(Math.max(0.35, dark));
     vis.bodyMat.roughness = 0.38 + d * 0.005;
-    vis.wheels[0].position.y = 0.38 + (d > 60 ? Math.sin(state.raceTime * 18) * 0.03 : 0);
+    vis.wheels[0].position.y = vis.wheelY + (d > 60 ? Math.sin(state.raceTime * 18) * 0.03 : 0);
   }
 
   function dmgLabel(d) {
@@ -1848,6 +1909,10 @@
 
   function addDamage(car, amount, impactSpeed) {
     if (car.dnf || car.finished || amount <= 0) return;
+    if (car.shieldT > 0) {
+      if (EXT && EXT.onShieldHit) EXT.onShieldHit(car);
+      return;
+    }
     if (car.impactCd > 0 && amount < 8) return;
     car.damage = clamp(car.damage + amount, 0, MAX_DAMAGE);
     car.impactCd = 0.12;
@@ -1997,7 +2062,8 @@
     const onCurb = Math.abs(lat) >= TRACK_HALF - 0.2 && Math.abs(lat) < TRACK_HALF + 1.1;
     const off = Math.abs(lat) > TRACK_HALF + 0.6;
 
-    let grip = (onTrack ? 1 : 0.32) * dmgGrip;
+    const vs = car.isPlayer && car.veh ? car.veh : NEUTRAL_VEH;
+    let grip = (onTrack ? 1 : Math.min(0.75, 0.32 * vs.off)) * dmgGrip * vs.grip;
     if (onCurb) grip *= 0.75;
     if (car.handbrake) grip *= 0.35;
 
@@ -2007,9 +2073,16 @@
 
     const sign = Math.sign(car.speed) || 1;
     const drag = 0.01 * car.speed * car.speed * sign;
-    const rollFric = (off ? 18 : 5.5) * sign;
+    const rollFric = (off ? 18 / vs.off : 5.5) * sign;
     const pw = car.isPlayer && !state.autopilot ? 1 : car.aiPower;
-    const engine = canDrive ? car.throttle * 58 * dmgSpeed * pw : 0;
+    let engine = canDrive ? car.throttle * 58 * dmgSpeed * pw * vs.acc : 0;
+    let boostMul = 1;
+    if (car.boostT > 0) {
+      car.boostT -= dt;
+      if (canDrive) engine += 44;
+      boostMul = 1.2;
+    }
+    if (car.shieldT > 0) car.shieldT -= dt;
     const brakes = canDrive ? car.brake * 78 : car.finished || car.dnf ? 40 : 0;
     const hb = canDrive && car.handbrake ? 50 * sign : 0;
     const gravity = canDrive ? -9.8 * car.slope * 1.6 : 0; // hills matter a little
@@ -2018,7 +2091,7 @@
     if (!canDrive && state.mode !== 'race') car.speed *= Math.pow(0.02, dt);
     if (!canDrive && Math.abs(car.speed) < 0.5) car.speed = 0;
 
-    const maxSpd = car.maxSpd * dmgSpeed * (off ? 0.55 : 1);
+    const maxSpd = car.maxSpd * vs.top * boostMul * dmgSpeed * (off ? Math.min(0.85, 0.55 * vs.off) : 1);
     if (car.speed > maxSpd) car.speed = lerp(car.speed, maxSpd, 0.08);
     if (car.speed < -18) car.speed = -18;
     if (car.dnf) {
@@ -2125,9 +2198,14 @@
     if (!state.headless) {
       const spin = car.speed * dt * 1.65;
       const wh = car.vis.wheels;
-      for (let i = 0; i < 4; i++) {
-        wh[i].rotation.x += spin;
-        if (i < 2) wh[i].rotation.y = car.steerVis * 4.5;
+      if (car.vis.noSpin) {
+        car.vis.body.position.y = Math.sin(performance.now() * 0.006 + car.id) * 0.06;
+        for (let i = 0; i < wh.length; i++) wh[i].rotation.y = i < 2 ? car.steerVis * 2 : 0;
+      } else {
+        for (let i = 0; i < wh.length; i++) {
+          wh[i].rotation.x += spin;
+          if (i < 2) wh[i].rotation.y = car.steerVis * 4.5;
+        }
       }
       if (dmg > 26 && Math.random() < dt * (4 + dmg * 0.12)) {
         emitSmoke(car.x - Math.sin(car.yaw) * 1.9, car.y + 0.7, car.z - Math.cos(car.yaw) * 1.9, dmg > 60, dmg > 82);
@@ -2212,9 +2290,13 @@
     state.camX = lerp(state.camX, tx, a);
     state.camY = lerp(state.camY, ty, a);
     state.camZ = lerp(state.camZ, tz, a);
-    // keep the camera above the road on crests
-    const under = sampleAt(nearestIdx(state.camX, state.camZ, c.idx - 2));
-    if (state.camY < under.y + 1.8) state.camY = under.y + 1.8;
+    // keep the camera above the road on crests (the hub has its own flat ground)
+    if (state.mode === 'hub') {
+      if (state.camY < c.y + 1.6) state.camY = c.y + 1.6;
+    } else {
+      const under = sampleAt(nearestIdx(state.camX, state.camZ, c.idx - 2));
+      if (state.camY < under.y + 1.8) state.camY = under.y + 1.8;
+    }
     state.lookX = lerp(state.lookX, c.x + Math.sin(c.yaw) * 8, a);
     state.lookY = lerp(state.lookY, c.y + 1.15, a);
     state.lookZ = lerp(state.lookZ, c.z + Math.cos(c.yaw) * 8, a);
@@ -2429,7 +2511,8 @@
     TRACKS.forEach((t) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'track-tile' + (t.id === settings.track ? ' on' : '');
+      const locked = t.dlc && !dlcOwned();
+      b.className = 'track-tile' + (t.id === settings.track ? ' on' : '') + (t.dlc ? ' dlc' : '') + (locked ? ' locked' : '');
       b.dataset.id = t.id;
       const src = tileCanvas(t);
       const cv = document.createElement('canvas');
@@ -2441,9 +2524,15 @@
       const bl = bestLapFor(t.id);
       b.insertAdjacentHTML(
         'beforeend',
-        '<div class="tt">' + t.tag + ' · ' + (L.len / 1000).toFixed(2) + ' KM</div><div class="tn">' + t.name + '</div><div class="tb">' + (bl ? 'BEST ' + fmtTime(bl) : '&nbsp;') + '</div>'
+        (locked ? '<div class="lock">🔒</div>' : '') + '<div class="tt">' + t.tag + ' · ' + (L.len / 1000).toFixed(2) + ' KM</div><div class="tn">' + t.name + '</div><div class="tb">' + (bl ? 'BEST ' + fmtTime(bl) : '&nbsp;') + '</div>'
       );
-      b.addEventListener('click', () => selectTrack(t.id));
+      b.addEventListener('click', () => {
+        if (locked) {
+          trackDesc.innerHTML = '🔒 <b>' + t.name + '</b> is in the <b>SUPER GRID EXPANSION</b>. Unlock it with tickets in the Grok Arcade DLC Shop (DLC Machine 3000, Hall of Game Records).';
+          return;
+        }
+        selectTrack(t.id);
+      });
       trackList.appendChild(b);
     });
     trackDesc.textContent = trackById(settings.track).sub;
@@ -2508,7 +2597,7 @@
   }
 
   function openChampionship(fresh) {
-    if (fresh || !champ.active || champ.round >= TRACKS.length) {
+    if (fresh || !champ.active || champ.round >= champ.order.length) {
       champ.active = true;
       champ.round = 0;
       champ.points = [0, 0, 0, 0, 0];
@@ -2521,18 +2610,19 @@
     if (TR.id !== t.id) loadTrack(t);
     renderChamp(
       'GROK GRID CHAMPIONSHIP · ' + DIFFS[champ.diff].label + ' · ' + champ.laps + (champ.laps === 1 ? ' LAP' : ' LAPS'),
-      'ROUND ' + (champ.round + 1) + ' / ' + TRACKS.length,
+      'ROUND ' + (champ.round + 1) + ' / ' + champ.order.length,
       'Next: ' + t.name + '. Points 10-6-4-2-1, a DNF scores nothing.',
       'START ROUND'
     );
   }
 
   function updateChampButton() {
-    const mid = champ.active && champ.round > 0 && champ.round < TRACKS.length;
+    const mid = champ.active && champ.round > 0 && champ.round < champ.order.length;
     el('champ-btn').textContent = mid ? 'CHAMPIONSHIP · R' + (champ.round + 1) : 'CHAMPIONSHIP';
   }
 
   function goTitle() {
+    if (EXT && EXT.onTitle) EXT.onTitle();
     state.mode = 'title';
     state.paused = false;
     state.inChamp = false;
@@ -2566,6 +2656,7 @@
     settings.diff = dkey; // gridPlace reads the spread from the active difficulty
     gridPlace();
     settings.diff = keepDiff;
+    if (EXT && EXT.onRaceStart) EXT.onRaceStart(TR);
     state.mode = 'countdown';
     state.paused = false;
     hideOverlay();
@@ -2606,12 +2697,14 @@
 
   function togglePause() {
     if (net()) return; // no pausing an online race
-    if (state.mode !== 'race' && state.mode !== 'countdown') return;
+    if (state.mode !== 'race' && state.mode !== 'countdown' && state.mode !== 'hub') return;
     state.paused = !state.paused;
     if (state.paused) {
       touch.accel = touch.brake = 0;
       endSteer();
-      el('pause-menu-btn').textContent = state.inChamp ? 'RETIRE (DNF)' : 'QUIT TO MENU';
+      const inHub = state.mode === 'hub';
+      el('pause-menu-btn').textContent = inHub ? 'EXIT HUB' : state.inChamp ? 'RETIRE (DNF)' : 'QUIT TO MENU';
+      el('restart-btn').style.display = inHub ? 'none' : '';
       showOverlay('pause');
     } else {
       hideOverlay();
@@ -2693,7 +2786,7 @@
   }
 
   function configureResultButtons() {
-    const label = state.inChamp ? (champ.round >= TRACKS.length ? 'FINAL STANDINGS' : 'STANDINGS') : 'RETRY';
+    const label = state.inChamp ? (champ.round >= champ.order.length ? 'FINAL STANDINGS' : 'STANDINGS') : 'RETRY';
     retryBtn.textContent = label;
     dnfRetryBtn.textContent = label;
   }
@@ -2701,7 +2794,7 @@
   function onResultPrimary() {
     if (net()) return; // online results have their own buttons
     if (state.inChamp) {
-      if (champ.round >= TRACKS.length) {
+      if (champ.round >= champ.order.length) {
         const st = champStandings();
         const myPos = st.findIndex((r) => r.c.isPlayer) + 1;
         renderChamp(
@@ -2751,7 +2844,19 @@
   /* ---------- loop ---------- */
   const clock = new THREE.Clock();
 
+  // player driving input (keys ramp, thumb stick) - shared by the race and the hub
+  function driveInput(dt) {
+    const inp = readInput();
+    if (inp.key || (!inp.touch && keySteer !== 0)) inp.st = rampKeySteer(inp.st, dt);
+    else keySteer = 0;
+    return inp;
+  }
+
   function update(dt) {
+    if (state.mode === 'hub') {
+      if (EXT && EXT.hubUpdate) EXT.hubUpdate(dt, driveInput(dt));
+      return;
+    }
     const racing = state.mode === 'race';
     const counting = state.mode === 'countdown';
     if (counting) tickCountdown(dt);
@@ -2770,9 +2875,7 @@
       if (state.autopilot && racing) {
         updateAI(player, dt, DIFFS.pilot);
       } else {
-        let inp = readInput();
-        if (inp.key || (!inp.touch && keySteer !== 0)) inp.st = rampKeySteer(inp.st, dt);
-        else keySteer = 0;
+        let inp = driveInput(dt);
         if (racing && settings.assist && line && line.vp) inp = assistInput(player, inp, dt);
         player.throttle = inp.th;
         player.brake = racing ? inp.br : 0;
@@ -2795,20 +2898,23 @@
       integrateCar(car, dt, racing && !car.dnf && !(car.isPlayer && car.finished));
     }
     if (racing || counting) collideCars();
+    if (EXT && EXT.raceUpdate && (racing || counting)) EXT.raceUpdate(dt, racing);
     rankCars();
   }
 
-  // adaptive resolution for phones: drop the pixel ratio if frames run long
+  // adaptive sharpness for phones: only ever goes UP (never blurs the picture mid-race) when
+  // frames have plenty of headroom, up to the screen's own pixel ratio (max 2)
   let perfAcc = 0, perfN = 0;
+  const pixelMax = Math.min(window.devicePixelRatio || 1, 2);
   function perfTick(rawDt) {
-    if (!isTouch || pixelRatio <= 1) return;
+    if (!isTouch || pixelRatio >= pixelMax) return;
     perfAcc += rawDt;
     perfN++;
-    if (perfN >= 90) {
+    if (perfN >= 120) {
       const avg = perfAcc / perfN;
       perfAcc = perfN = 0;
-      if (avg > 0.024) {
-        pixelRatio = Math.max(1, pixelRatio - 0.25);
+      if (avg < 0.0135) {
+        pixelRatio = Math.min(pixelMax, pixelRatio + 0.25);
         renderer.setPixelRatio(pixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
       }
@@ -2819,7 +2925,7 @@
     requestAnimationFrame(frame);
     const raw = clock.getDelta();
     const dt = Math.min(raw, 0.05);
-    if (state.mode === 'race') perfTick(raw);
+    if (state.mode === 'race' || state.mode === 'hub') perfTick(raw);
     if (!state.paused) {
       // two half steps on long frames keeps the physics stable on slow phones
       if (dt > 0.03) {
@@ -2831,12 +2937,14 @@
     }
     updateCamera(state.paused ? 0 : dt);
     updateHUD();
-    if (state.mode !== 'title') drawMinimap();
-    audioEngine(player.speed, player.throttle, player.damage, state.mode === 'race' || state.mode === 'countdown');
+    if (state.mode !== 'title' && state.mode !== 'hub') drawMinimap();
+    if (EXT && EXT.frame) EXT.frame(dt, state.paused);
+    audioEngine(player.speed, player.throttle, player.damage, state.mode === 'race' || state.mode === 'countdown' || state.mode === 'hub');
     renderer.render(scene, camera);
   }
 
   // boot
+  if (EXT && EXT.boot) EXT.boot({ state, cars, player, settings, H, scene, camera, setVehicle, setRacingChrome, showOverlay, hideOverlay, goTitle, startRace, loadTrack: (id) => loadTrack(trackById(id)), selectTrack, openTrackSelect, syncCarMesh, snapCamera, addDamage, audioBeep, togglePause, trackById, get trackGroup() { return trackGroup; }, isTouch, LIVERY, hemi, sun, ambient, sunDir, renderer, fmtTime, hud, cards, el });
   loadTrack(trackById(settings.track));
   goTitle();
   frame();
@@ -2857,6 +2965,9 @@
     openTrackSelect, openChampionship, goTitle, togglePause, onResultPrimary,
     rankCars, showOverlay, hideOverlay, setRacingChrome, fmtTime, syncCarMesh, applyVisualDamage, snapCamera, gridPlace, setStartLights,
     get countdownEl() { return countdownEl; },
+    setVehicle, dlcOwned, H, driveInput, togglePause, addDamage, endFinish,
+    get scene() { return scene; }, get camera() { return camera; }, get renderer() { return renderer; },
+    get pixelRatio() { return pixelRatio; },
     setAutopilot: (on) => {
       state.autopilot = !!on;
     },
