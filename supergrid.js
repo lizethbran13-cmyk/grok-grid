@@ -193,7 +193,7 @@
   U.chunked = function (H, geo, mat, list, opts) {
     const THREE = H.THREE;
     opts = opts || {};
-    const cell = opts.cell || 160;
+    const cell = opts.cell || 280;
     const groups = new Map();
     for (const it of list) {
       const k = Math.floor(it.x / cell) + ',' + Math.floor(it.z / cell);
@@ -300,7 +300,7 @@
     return g;
   }
   function addMesh(parent, geo, mat, x, y, z, cast) {
-    const m = new THREE_().Mesh(geo, mat);
+    const m = new _T.Mesh(geo, mat);
     m.position.set(x, y, z);
     if (cast) m.castShadow = true;
     parent.add(m);

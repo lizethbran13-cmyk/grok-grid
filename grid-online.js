@@ -16,8 +16,8 @@
   function players() { return room ? room.players() : []; }
   function byPid(pid) { return room && room.player(pid); }
   function now() { return performance.now(); }
-  function tracks() { return Gd.TRACKS; }
-  function trackName(id) { var t = tracks().find(function (x) { return x.id === id; }); return t ? t.name : id; }
+  function tracks() { return Gd.TRACKS.filter(function (t) { return !t.dlc || Gd.dlcOwned(); }); } // Super Grid tracks: the host's copy is shared with friends
+  function trackName(id) { var t = Gd.TRACKS.find(function (x) { return x.id === id; }); return t ? t.name : id; }
 
   /* ---------- overlay UI ---------- */
   function build() {
@@ -165,13 +165,15 @@
   }
 
   /* ---------- state sync ---------- */
-  function pack(c) { return [+c.x.toFixed(2), +c.y.toFixed(2), +c.z.toFixed(2), +c.yaw.toFixed(3), +c.speed.toFixed(2), +(c.steerVis || 0).toFixed(2), c.lap, +c.progress.toFixed(4), c.finished ? 1 : 0, +(c.finishTime || 0).toFixed(3), c.dnf ? 1 : 0, Math.round(c.damage), isFinite(c.bestLap) ? +c.bestLap.toFixed(3) : 0]; }
+  function pack(c) { return [+c.x.toFixed(2), +c.y.toFixed(2), +c.z.toFixed(2), +c.yaw.toFixed(3), +c.speed.toFixed(2), +(c.steerVis || 0).toFixed(2), c.lap, +c.progress.toFixed(4), c.finished ? 1 : 0, +(c.finishTime || 0).toFixed(3), c.dnf ? 1 : 0, Math.round(c.damage), isFinite(c.bestLap) ? +c.bestLap.toFixed(3) : 0, VK.indexOf(c.vis.kind || 'f1')]; }
+  var VK = (window.GRID_EXT && window.GRID_EXT.VEHICLE_IDS) || ['f1'];
   function apply(c, s) {
     if (!c || c === player || !s) return;
     var t = now(); if (c.net) stats.maxGap = Math.max(stats.maxGap, t - c.net.at);
     var dmgWas = c.damage;
     c.net = { x: s[0], y: s[1], z: s[2], yaw: s[3], speed: s[4], st: s[5], at: t };
     c.lap = s[6]; c.progress = s[7]; c.finished = !!s[8]; c.finishTime = s[9]; c.dnf = !!s[10]; c.damage = s[11]; c.bestLap = s[12] || Infinity;
+    if (s[13] != null && VK[s[13]] && c.vis.kind !== VK[s[13]]) Gd.setVehicle(c, VK[s[13]]); // Super Grid cars show up for friends too
     if (Math.abs(c.damage - dmgWas) >= 5) Gd.applyVisualDamage(c);
     stats.recv++;
   }

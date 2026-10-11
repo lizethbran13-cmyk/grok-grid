@@ -2639,6 +2639,8 @@
   function startRace(opts) {
     opts = opts || {};
     audioEnsure();
+    // Super Grid tracks need the expansion (an online host shares theirs with friends)
+    if (TR.dlc && !dlcOwned() && !(window.GridNet && window.GridNet.active)) selectTrack('park');
     let dkey = settings.diff;
     if (state.inChamp && champ.active) {
       dkey = champ.diff;
@@ -2944,7 +2946,7 @@
   }
 
   // boot
-  if (EXT && EXT.boot) EXT.boot({ state, cars, player, settings, H, scene, camera, setVehicle, setRacingChrome, showOverlay, hideOverlay, goTitle, startRace, loadTrack: (id) => loadTrack(trackById(id)), selectTrack, openTrackSelect, syncCarMesh, snapCamera, addDamage, audioBeep, togglePause, trackById, get trackGroup() { return trackGroup; }, isTouch, LIVERY, hemi, sun, ambient, sunDir, renderer, fmtTime, hud, cards, el });
+  if (EXT && EXT.boot) EXT.boot({ state, cars, player, settings, H, scene, camera, setVehicle, setRacingChrome, showOverlay, hideOverlay, goTitle, startRace, loadTrack: (id) => loadTrack(trackById(id)), selectTrack, openTrackSelect, syncCarMesh, snapCamera, addDamage, audioBeep, togglePause, trackById, get trackGroup() { return trackGroup; }, isTouch, LIVERY, applyVisualDamage, gridPlace, makeCar, hemi, sun, ambient, sunDir, renderer, fmtTime, hud, cards, el });
   loadTrack(trackById(settings.track));
   goTitle();
   frame();

@@ -42,7 +42,7 @@
   function cloudGeo(T, tint) {
     const parts = [];
     const c = tint || 0xffffff;
-    [[0, 0, 0, 1.0], [0.9, -0.15, 0.2, 0.75], [-0.9, -0.1, -0.1, 0.8], [0.35, 0.45, -0.1, 0.7], [-0.4, 0.35, 0.3, 0.65], [1.6, -0.3, 0, 0.5], [-1.6, -0.3, 0.1, 0.5]].forEach(([x, y, z, r]) => parts.push([new T.IcosahedronGeometry(1, 2), c, x, y, z, 0, 0, 0, r, r * 0.85, r]));
+    [[0, 0, 0, 1.0], [0.9, -0.15, 0.2, 0.75], [-0.9, -0.1, -0.1, 0.8], [0.35, 0.45, -0.1, 0.7], [-0.4, 0.35, 0.3, 0.65], [1.6, -0.3, 0, 0.5], [-1.6, -0.3, 0.1, 0.5]].forEach(([x, y, z, r]) => parts.push([new T.IcosahedronGeometry(1, 1), c, x, y, z, 0, 0, 0, r, r * 0.85, r]));
     return prop(T, parts);
   }
   function placeFar(H, n, rMin, rMax, cx0, cz0, clear) {
@@ -69,9 +69,9 @@
       dirt.push({ x: s.x, y: s.y - 2.1, z: s.z, sx: W + 6.2, sy: 1.6, sz: W + 6.2, ry: i * 0.7 });
       if (i % 6 === 0) rocks.push({ x: s.x + H.srnd(-2, 2), y: s.y - 2.8, z: s.z + H.srnd(-2, 2), sx: W + H.srnd(2, 6), sy: H.srnd(14, 32), sz: W + H.srnd(2, 6), ry: H.srand() * 3 });
     }
-    G.add(U.chunked(H, new T.CylinderGeometry(1, 0.96, 1, 14), new T.MeshLambertMaterial({ color: 0x72d65e }), caps, { receive: true }));
-    G.add(U.chunked(H, new T.CylinderGeometry(0.97, 0.9, 1, 12), new T.MeshLambertMaterial({ color: 0x9a6a42 }), dirt));
-    const rockGeo = new T.ConeGeometry(1, 1, 9);
+    G.add(U.chunked(H, new T.CylinderGeometry(1, 0.96, 1, 9), new T.MeshLambertMaterial({ color: 0x72d65e }), caps, { receive: true }));
+    G.add(U.chunked(H, new T.CylinderGeometry(0.97, 0.9, 1, 8), new T.MeshLambertMaterial({ color: 0x9a6a42 }), dirt));
+    const rockGeo = new T.ConeGeometry(1, 1, 6);
     rockGeo.rotateX(Math.PI);
     rockGeo.translate(0, -0.5, 0);
     G.add(U.chunked(H, rockGeo, new T.MeshLambertMaterial({ color: 0x8a6448 }), rocks));
@@ -96,16 +96,16 @@
       [new T.IcosahedronGeometry(0.5, 1), c, x, 0.1 + h + 0.25, z, 0, 0, 0, 1, 0.9, 1],
     ];
     const isl1 = prop(T, [
-      [new T.CylinderGeometry(1, 0.95, 0.22, 16), 0x72d65e, 0, 0, 0],
-      [new T.ConeGeometry(0.95, 1.6, 10), 0x8a6448, 0, -0.9, 0, Math.PI, 0, 0],
+      [new T.CylinderGeometry(1, 0.95, 0.22, 11), 0x72d65e, 0, 0, 0],
+      [new T.ConeGeometry(0.95, 1.6, 7), 0x8a6448, 0, -0.9, 0, Math.PI, 0, 0],
       [new T.ConeGeometry(0.4, 0.8, 8), 0x7a5a40, 0.45, -1.1, 0.2, Math.PI, 0, 0.2],
       ...treeParts(0.3, 0.2, 0.55, 0x3fbe48), ...treeParts(-0.35, -0.25, 0.42, 0x6fd34a), ...treeParts(-0.1, 0.5, 0.35, 0xff8fc8),
     ]);
     const isl2 = prop(T, [
-      [new T.CylinderGeometry(1, 0.95, 0.22, 16), 0x72d65e, 0, 0, 0],
-      [new T.ConeGeometry(0.95, 1.9, 10), 0x8a6448, 0, -1.05, 0, Math.PI, 0, 0],
-      [new T.CylinderGeometry(0.22, 0.24, 0.32, 12), 0xfff2dc, 0.1, 0.27, 0.0],
-      [new T.ConeGeometry(0.32, 0.32, 12), 0xff5f6a, 0.1, 0.59, 0.0],
+      [new T.CylinderGeometry(1, 0.95, 0.22, 11), 0x72d65e, 0, 0, 0],
+      [new T.ConeGeometry(0.95, 1.9, 7), 0x8a6448, 0, -1.05, 0, Math.PI, 0, 0],
+      [new T.CylinderGeometry(0.22, 0.24, 0.32, 8), 0xfff2dc, 0.1, 0.27, 0.0],
+      [new T.ConeGeometry(0.32, 0.32, 8), 0xff5f6a, 0.1, 0.59, 0.0],
       [new T.SphereGeometry(0.06, 8, 6), 0x5ab8ff, 0.1, 0.27, 0.23],
       ...treeParts(-0.45, 0.3, 0.5, 0x4cc046), ...treeParts(0.5, -0.4, 0.4, 0xffd23b),
     ]);
@@ -119,7 +119,7 @@
     const vc = vcMat(T);
     G.add(U.chunked(H, isl1, vc, L1, { cell: 400 }));
     G.add(U.chunked(H, isl2, vc, L2, { cell: 400 }));
-    G.add(H.instanced(new T.CylinderGeometry(1, 1.4, 1, 12, 1, true), new T.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0.7, depthWrite: false, side: T.DoubleSide }), falls));
+    G.add(H.instanced(new T.CylinderGeometry(1, 1.4, 1, 8, 1, true), new T.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0.7, depthWrite: false, side: T.DoubleSide }), falls));
     // clouds: a fluffy cloud sea below and puffs all around
     const cg = cloudGeo(T);
     const cm = new T.MeshLambertMaterial({ vertexColors: true, emissive: 0x404858 });
@@ -136,8 +136,8 @@
     [0.12, 0.47, 0.78].forEach((f) => {
       const s = S[Math.round(N * f) % N];
       const R = W + 4;
-      const parts = RB.map((c, k) => [new T.TorusGeometry(R - k * 0.9, 0.48, 8, 44, Math.PI), c, 0, 0, 0]);
-      parts.push([new T.IcosahedronGeometry(1, 2), 0xffffff, R - 2.2, 0, 0, 0, 0, 0, 3.6, 2.4, 3.2], [new T.IcosahedronGeometry(1, 2), 0xffffff, -R + 2.2, 0, 0, 0, 0, 0, 3.6, 2.4, 3.2]);
+      const parts = RB.map((c, k) => [new T.TorusGeometry(R - k * 0.9, 0.48, 6, 30, Math.PI), c, 0, 0, 0]);
+      parts.push([new T.IcosahedronGeometry(1, 1), 0xffffff, R - 2.2, 0, 0, 0, 0, 0, 3.6, 2.4, 3.2], [new T.IcosahedronGeometry(1, 1), 0xffffff, -R + 2.2, 0, 0, 0, 0, 0, 3.6, 2.4, 3.2]);
       const m = new T.Mesh(prop(T, parts), new T.MeshLambertMaterial({ vertexColors: true, emissive: 0x202020 }));
       m.position.set(s.x, s.y - 0.4, s.z);
       m.rotation.y = Math.atan2(-s.tx, -s.tz);
@@ -146,11 +146,11 @@
     });
     // hot-air balloons, gently bobbing
     const balloon = (c1, c2) => prop(T, [
-      [new T.SphereGeometry(1, 20, 14), c1, 0, 1.2, 0, 0, 0, 0, 1, 1.12, 1],
-      [new T.TorusGeometry(0.97, 0.08, 8, 30), c2, 0, 1.25, 0, Math.PI / 2, 0, 0],
-      [new T.TorusGeometry(0.8, 0.07, 8, 30), c2, 0, 1.85, 0, Math.PI / 2, 0, 0],
-      [new T.ConeGeometry(0.5, 0.6, 14), c1, 0, 0.12, 0, Math.PI, 0, 0],
-      [new T.CylinderGeometry(0.22, 0.18, 0.26, 12), 0x9a6a3a, 0, -0.62, 0],
+      [new T.SphereGeometry(1, 12, 8), c1, 0, 1.2, 0, 0, 0, 0, 1, 1.12, 1],
+      [new T.TorusGeometry(0.97, 0.08, 6, 21), c2, 0, 1.25, 0, Math.PI / 2, 0, 0],
+      [new T.TorusGeometry(0.8, 0.07, 6, 21), c2, 0, 1.85, 0, Math.PI / 2, 0, 0],
+      [new T.ConeGeometry(0.5, 0.6, 9), c1, 0, 0.12, 0, Math.PI, 0, 0],
+      [new T.CylinderGeometry(0.22, 0.18, 0.26, 8), 0x9a6a3a, 0, -0.62, 0],
       [new T.CylinderGeometry(0.012, 0.012, 0.6, 4), 0x5a4030, 0.17, -0.28, 0.0],
       [new T.CylinderGeometry(0.012, 0.012, 0.6, 4), 0x5a4030, -0.17, -0.28, 0.0],
     ]);
@@ -175,9 +175,9 @@
     const sails = [];
     H.scatter(8, W + 3.5, W + 5.5, 2.5).forEach((p) => {
       const g = new T.Group();
-      const tower = new T.Mesh(new T.CylinderGeometry(0.9, 1.6, 9, 12), new T.MeshLambertMaterial({ color: 0xfff2dc }));
+      const tower = new T.Mesh(new T.CylinderGeometry(0.9, 1.6, 9, 8), new T.MeshLambertMaterial({ color: 0xfff2dc }));
       tower.position.y = 4.5;
-      const cap = new T.Mesh(new T.ConeGeometry(1.4, 2, 12), new T.MeshLambertMaterial({ color: 0xff5f6a }));
+      const cap = new T.Mesh(new T.ConeGeometry(1.4, 2, 8), new T.MeshLambertMaterial({ color: 0xff5f6a }));
       cap.position.y = 10;
       const hub = new T.Group();
       hub.position.set(0, 8.4, 1.3);
@@ -218,11 +218,11 @@
     // lollipop trees
     const lolly = (c) => prop(T, [
       [new T.CylinderGeometry(0.11, 0.13, 4.2, 8), 0xffffff, 0, 2.1, 0],
-      [new T.CylinderGeometry(1.45, 1.45, 0.34, 28), c, 0, 4.9, 0, Math.PI / 2, 0, 0],
-      [new T.TorusGeometry(1.0, 0.13, 8, 28), 0xffffff, 0, 4.9, 0.18],
-      [new T.TorusGeometry(0.55, 0.12, 8, 24), 0xffffff, 0, 4.9, 0.18],
-      [new T.TorusGeometry(1.0, 0.13, 8, 28), 0xffffff, 0, 4.9, -0.18],
-      [new T.TorusGeometry(0.55, 0.12, 8, 24), 0xffffff, 0, 4.9, -0.18],
+      [new T.CylinderGeometry(1.45, 1.45, 0.34, 16), c, 0, 4.9, 0, Math.PI / 2, 0, 0],
+      [new T.TorusGeometry(1.0, 0.13, 4, 16), 0xffffff, 0, 4.9, 0.18],
+      [new T.TorusGeometry(0.55, 0.12, 4, 12), 0xffffff, 0, 4.9, 0.18],
+      [new T.TorusGeometry(1.0, 0.13, 4, 16), 0xffffff, 0, 4.9, -0.18],
+      [new T.TorusGeometry(0.55, 0.12, 4, 12), 0xffffff, 0, 4.9, -0.18],
     ]);
     const lcols = [0xff3f8a, 0x3fc8ff, 0xffb02e, 0x9a5bff];
     const lists = lcols.map(() => []);
@@ -238,11 +238,11 @@
       const r = H.srnd(1.2, 3.6);
       gd.push({ x: p.x, y: p.y - 0.75, z: p.z, sx: r, sy: r * H.srnd(0.9, 1.25), sz: r, color: gcols[(H.srand() * 6) | 0] });
     });
-    G.add(U.chunked(H, new T.SphereGeometry(1, 18, 10, 0, TAU, 0, Math.PI / 2), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.05 }), gd, { cast: true, far: 380 }));
+    G.add(U.chunked(H, new T.SphereGeometry(1, 11, 6, 0, TAU, 0, Math.PI / 2), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.05 }), gd, { cast: true, far: 380 }));
     // candy canes along the barriers
     const caneParts = [];
-    for (let k = 0; k < 8; k++) caneParts.push([new T.CylinderGeometry(0.22, 0.22, 0.6, 12), k % 2 ? 0xffffff : 0xff2a4a, 0, 0.3 + k * 0.6, 0]);
-    for (let k = 0; k < 6; k++) caneParts.push([new T.TorusGeometry(0.7, 0.22, 10, 6, Math.PI / 6), k % 2 ? 0xffffff : 0xff2a4a, 0.7, 4.8, 0, 0, 0, (k * Math.PI) / 6]);
+    for (let k = 0; k < 8; k++) caneParts.push([new T.CylinderGeometry(0.22, 0.22, 0.6, 8, 1, true), k % 2 ? 0xffffff : 0xff2a4a, 0, 0.3 + k * 0.6, 0]);
+    for (let k = 0; k < 6; k++) caneParts.push([new T.TorusGeometry(0.7, 0.22, 7, 3, Math.PI / 6), k % 2 ? 0xffffff : 0xff2a4a, 0.7, 4.8, 0, 0, 0, (k * Math.PI) / 6]);
     const caneG = prop(T, caneParts);
     const canes = [];
     for (let i = 0; i < N; i += 7) {
@@ -259,7 +259,7 @@
     [[0.18, 0xff7ab8], [0.52, 0x7a4a2a], [0.83, 0x7df3e0]].forEach(([f, frost]) => {
       const s = S[Math.round(N * f) % N];
       const R = W + 3.2, cy = R * 0.5;
-      const parts = [[new T.TorusGeometry(R, 2.3, 16, 56), 0xe0a05a, 0, cy, 0], [new T.TorusGeometry(R + 0.2, 2.15, 14, 48, Math.PI), frost, 0, cy, 0.15]];
+      const parts = [[new T.TorusGeometry(R, 2.3, 12, 39), 0xe0a05a, 0, cy, 0], [new T.TorusGeometry(R + 0.2, 2.15, 10, 33, Math.PI), frost, 0, cy, 0.15]];
       for (let k = 0; k < 46; k++) {
         const a = 0.15 + (k / 46) * (Math.PI - 0.3);
         const rr = R + 0.2 + Math.cos(k * 2.3) * 1.2;
@@ -273,24 +273,24 @@
     });
     // cupcake cottages
     const cup = (c) => prop(T, [
-      [new T.CylinderGeometry(2.4, 1.9, 2.6, 16), 0xffffff, 0, 1.3, 0],
-      [new T.CylinderGeometry(2.42, 1.92, 2.6, 16, 1, true), c, 0, 1.3, 0, 0, 0.2, 0],
-      [new T.SphereGeometry(2.6, 20, 12, 0, TAU, 0, Math.PI / 2), 0xfff0f6, 0, 2.6, 0, 0, 0, 0, 1, 0.8, 1],
-      [new T.SphereGeometry(1.6, 16, 10, 0, TAU, 0, Math.PI / 2), 0xfff0f6, 0, 4.2, 0, 0, 0, 0, 1, 0.7, 1],
-      [new T.SphereGeometry(0.5, 12, 10), 0xff2a4a, 0, 5.4, 0],
-      [new T.CylinderGeometry(0.5, 0.5, 1.3, 12, 1, false, 0, Math.PI), 0x8a4a2a, 0, 0.65, 2.15, 0, -Math.PI / 2, 0],
-      [new T.SphereGeometry(0.35, 10, 8), 0x7df3ff, 1.3, 1.6, 1.75],
-      [new T.SphereGeometry(0.35, 10, 8), 0x7df3ff, -1.3, 1.6, 1.75],
+      [new T.CylinderGeometry(2.4, 1.9, 2.6, 11), 0xffffff, 0, 1.3, 0],
+      [new T.CylinderGeometry(2.42, 1.92, 2.6, 11, 1, true), c, 0, 1.3, 0, 0, 0.2, 0],
+      [new T.SphereGeometry(2.6, 12, 7, 0, TAU, 0, Math.PI / 2), 0xfff0f6, 0, 2.6, 0, 0, 0, 0, 1, 0.8, 1],
+      [new T.SphereGeometry(1.6, 9, 6, 0, TAU, 0, Math.PI / 2), 0xfff0f6, 0, 4.2, 0, 0, 0, 0, 1, 0.7, 1],
+      [new T.SphereGeometry(0.5, 8, 6), 0xff2a4a, 0, 5.4, 0],
+      [new T.CylinderGeometry(0.5, 0.5, 1.3, 8, 1, false, 0, Math.PI), 0x8a4a2a, 0, 0.65, 2.15, 0, -Math.PI / 2, 0],
+      [new T.SphereGeometry(0.35, 8, 6), 0x7df3ff, 1.3, 1.6, 1.75],
+      [new T.SphereGeometry(0.35, 8, 6), 0x7df3ff, -1.3, 1.6, 1.75],
     ]);
     const cups = [[], [], []];
     H.scatter(18, W + 10, W + 34, 7).forEach((p, i) => cups[i % 3].push({ x: p.x, y: p.y - 0.7, z: p.z, sx: H.srnd(1.1, 1.6), ry: Math.atan2(H.samples[p.i].x - p.x, H.samples[p.i].z - p.z) }));
     [0xff7ab8, 0x7ab8ff, 0xb8ff7a].forEach((c, i) => G.add(U.chunked(H, cup(c), shiny, cups[i], { cast: true })));
     // ice cream cone towers in the distance
     const cone = (a, b) => prop(T, [
-      [new T.ConeGeometry(1, 3, 16), 0xd9a05a, 0, 1.5, 0, Math.PI, 0, 0],
-      [new T.SphereGeometry(1.08, 18, 12), a, 0, 3.3, 0],
-      [new T.SphereGeometry(0.9, 18, 12), b, 0, 4.5, 0],
-      [new T.SphereGeometry(0.28, 10, 8), 0xff2a4a, 0, 5.5, 0],
+      [new T.ConeGeometry(1, 3, 11), 0xd9a05a, 0, 1.5, 0, Math.PI, 0, 0],
+      [new T.SphereGeometry(1.08, 11, 7), a, 0, 3.3, 0],
+      [new T.SphereGeometry(0.9, 11, 7), b, 0, 4.5, 0],
+      [new T.SphereGeometry(0.28, 8, 6), 0xff2a4a, 0, 5.5, 0],
     ]);
     const ic = [[], []];
     placeFar(H, 26, 150, 560, cx0, cz0, 60).forEach((p, i) => ic[i % 2].push({ x: p.x, y: -1, z: p.z, sx: H.srnd(5, 10), ry: H.srand() * 3 }));
@@ -301,20 +301,20 @@
       const p = placeFar(H, 1, 170, 230, cx0, cz0, 80)[0] || { x: cx0, z: cz0 + 300 };
       const parts = [];
       [[16, 7, 0xfff0f6], [11.5, 6, 0xffb8dc], [7, 5, 0xfff0f6]].reduce((y, [r, h, c]) => {
-        parts.push([new T.CylinderGeometry(r, r, h, 32), c, 0, y + h / 2, 0]);
-        parts.push([new T.TorusGeometry(r, 0.9, 10, 40), 0xff7ab8, 0, y + h, 0, Math.PI / 2, 0, 0]);
-        for (let k = 0; k < 14; k++) parts.push([new T.SphereGeometry(0.8, 10, 8), 0xff2a4a, Math.cos((k / 14) * TAU) * r, y + h + 0.8, Math.sin((k / 14) * TAU) * r]);
+        parts.push([new T.CylinderGeometry(r, r, h, 22), c, 0, y + h / 2, 0]);
+        parts.push([new T.TorusGeometry(r, 0.9, 7, 28), 0xff7ab8, 0, y + h, 0, Math.PI / 2, 0, 0]);
+        for (let k = 0; k < 14; k++) parts.push([new T.SphereGeometry(0.8, 8, 6), 0xff2a4a, Math.cos((k / 14) * TAU) * r, y + h + 0.8, Math.sin((k / 14) * TAU) * r]);
         return y + h;
       }, 0);
       for (let k = 0; k < 4; k++) {
         const a = (k / 4) * TAU + 0.4, x = Math.cos(a) * 19, z = Math.sin(a) * 19;
-        parts.push([new T.CylinderGeometry(3, 3.4, 16, 20), 0xfff0f6, x, 8, z], [new T.ConeGeometry(4, 7, 20), 0xa86bff, x, 19.5, z], [new T.SphereGeometry(0.8, 10, 8), 0xffe14a, x, 23.4, z]);
+        parts.push([new T.CylinderGeometry(3, 3.4, 16, 14), 0xfff0f6, x, 8, z], [new T.ConeGeometry(4, 7, 14), 0xa86bff, x, 19.5, z], [new T.SphereGeometry(0.8, 8, 6), 0xffe14a, x, 23.4, z]);
       }
-      for (let k = 0; k < 5; k++) parts.push([new T.CylinderGeometry(0.5, 0.5, 4, 10), [0xff3f8a, 0x3fc8ff, 0xffe14a, 0x3fd65a, 0xa86bff][k], Math.cos(k) * 3.5, 20, Math.sin(k) * 3.5]);
+      for (let k = 0; k < 5; k++) parts.push([new T.CylinderGeometry(0.5, 0.5, 4, 7), [0xff3f8a, 0x3fc8ff, 0xffe14a, 0x3fd65a, 0xa86bff][k], Math.cos(k) * 3.5, 20, Math.sin(k) * 3.5]);
       const m = new T.Mesh(prop(T, parts), shiny);
       m.position.set(p.x, -1, p.z);
       G.add(m);
-      const flames = new T.Mesh(new T.ConeGeometry(0.45, 1.2, 10), new T.MeshBasicMaterial({ color: 0xffb02e }));
+      const flames = new T.Mesh(new T.ConeGeometry(0.45, 1.2, 7), new T.MeshBasicMaterial({ color: 0xffb02e }));
       flames.position.set(p.x, 23, p.z);
       G.add(flames);
       EXT.anim.push((t) => flames.scale.set(1, 1 + Math.sin(t * 9) * 0.2, 1));
@@ -330,7 +330,7 @@
         G.add(lake);
         const mm = [];
         for (let k = 0; k < 14; k++) { const a = H.srand() * TAU, r = H.srnd(5, 32); mm.push({ x: p.x + Math.cos(a) * r, y: 0.5, z: p.z + Math.sin(a) * r, sx: H.srnd(1.2, 2), sy: 1.1, sz: H.srnd(1.2, 2) }); }
-        G.add(H.instanced(new T.CylinderGeometry(1, 1, 1, 16), new T.MeshLambertMaterial({ color: 0xfffaf4 }), mm));
+        G.add(H.instanced(new T.CylinderGeometry(1, 1, 1, 11), new T.MeshLambertMaterial({ color: 0xfffaf4 }), mm));
       }
     }
     // cotton-candy clouds
@@ -375,7 +375,7 @@
     const smokeM = new T.MeshLambertMaterial({ color: 0x6a5a5a, transparent: true, opacity: 0.75, depthWrite: false });
     const puffs = [];
     for (let k = 0; k < 12; k++) {
-      const m = new T.Mesh(new T.IcosahedronGeometry(1, 2), smokeM);
+      const m = new T.Mesh(new T.IcosahedronGeometry(1, 1), smokeM);
       G.add(m);
       puffs.push({ m, ph: k / 12 });
     }
@@ -444,9 +444,9 @@
       }
       for (let k = 0; k < 7; k++) {
         const a = (k / 7) * TAU;
-        parts.push([new T.SphereGeometry(1, 12, 8), k % 2 ? 0x2fae3a : 0x3fc84a, x + Math.cos(a) * 1.4, y + 0.1, Math.sin(a) * 1.4, 0, -a, 0.45, 1.8, 0.12, 0.45]);
+        parts.push([new T.SphereGeometry(1, 8, 6), k % 2 ? 0x2fae3a : 0x3fc84a, x + Math.cos(a) * 1.4, y + 0.1, Math.sin(a) * 1.4, 0, -a, 0.45, 1.8, 0.12, 0.45]);
       }
-      for (let k = 0; k < 3; k++) parts.push([new T.SphereGeometry(0.22, 10, 8), 0x6a4a22, x + Math.cos(k * 2) * 0.35, y - 0.35, Math.sin(k * 2) * 0.35]);
+      for (let k = 0; k < 3; k++) parts.push([new T.SphereGeometry(0.22, 8, 6), 0x6a4a22, x + Math.cos(k * 2) * 0.35, y - 0.35, Math.sin(k * 2) * 0.35]);
       return prop(T, parts);
     };
     const pl = [[], []];
@@ -455,7 +455,7 @@
     G.add(U.chunked(H, palm(1), vc, pl[0], { cast: true, far: 420 }));
     G.add(U.chunked(H, palm(-1), vc, pl[1], { cast: true, far: 420 }));
     // tiki torches along the barriers (flickering)
-    const torchG = prop(T, [[new T.CylinderGeometry(0.12, 0.16, 3.2, 8), 0x8a5a2e, 0, 1.6, 0], [new T.CylinderGeometry(0.4, 0.22, 0.5, 10), 0x5a3a1e, 0, 3.4, 0]]);
+    const torchG = prop(T, [[new T.CylinderGeometry(0.12, 0.16, 3.2, 8), 0x8a5a2e, 0, 1.6, 0], [new T.CylinderGeometry(0.4, 0.22, 0.5, 7), 0x5a3a1e, 0, 3.4, 0]]);
     const torches = [], flames = [];
     for (let i = 0; i < N; i += 9) {
       const s = S[i];
@@ -472,13 +472,13 @@
     EXT.anim.push((t) => flameM.color.setHSL(0.08 + Math.sin(t * 13) * 0.015, 1, 0.55 + Math.sin(t * 17) * 0.05));
     // smiling tiki statues
     const tiki = prop(T, [
-      [new T.CylinderGeometry(1, 1.1, 3.4, 14), 0x9a6a3a, 0, 1.7, 0],
-      [new T.SphereGeometry(0.34, 12, 10), 0xffffff, -0.42, 2.4, 0.86],
-      [new T.SphereGeometry(0.34, 12, 10), 0xffffff, 0.42, 2.4, 0.86],
-      [new T.SphereGeometry(0.16, 10, 8), 0x1a1a1a, -0.42, 2.4, 1.14],
-      [new T.SphereGeometry(0.16, 10, 8), 0x1a1a1a, 0.42, 2.4, 1.14],
-      [new T.TorusGeometry(0.45, 0.1, 8, 16, Math.PI), 0x5a2a1a, 0, 1.55, 0.95, 0, 0, Math.PI],
-      [new T.SphereGeometry(0.2, 10, 8), 0xff7a5a, 0, 1.95, 1.05],
+      [new T.CylinderGeometry(1, 1.1, 3.4, 9), 0x9a6a3a, 0, 1.7, 0],
+      [new T.SphereGeometry(0.34, 8, 6), 0xffffff, -0.42, 2.4, 0.86],
+      [new T.SphereGeometry(0.34, 8, 6), 0xffffff, 0.42, 2.4, 0.86],
+      [new T.SphereGeometry(0.16, 8, 6), 0x1a1a1a, -0.42, 2.4, 1.14],
+      [new T.SphereGeometry(0.16, 8, 6), 0x1a1a1a, 0.42, 2.4, 1.14],
+      [new T.TorusGeometry(0.45, 0.1, 6, 12, Math.PI), 0x5a2a1a, 0, 1.55, 0.95, 0, 0, Math.PI],
+      [new T.SphereGeometry(0.2, 8, 6), 0xff7a5a, 0, 1.95, 1.05],
       [new T.ConeGeometry(0.5, 1.6, 6), 0x3fc84a, -0.5, 3.9, 0, 0, 0, 0.4],
       [new T.ConeGeometry(0.5, 1.8, 6), 0x2fae3a, 0, 4.1, 0],
       [new T.ConeGeometry(0.5, 1.6, 6), 0x3fc84a, 0.5, 3.9, 0, 0, 0, -0.4],
@@ -488,10 +488,10 @@
     G.add(U.chunked(H, tiki, vc, tk, { cast: true }));
     // tiki huts on stilts
     const hut = prop(T, [
-      [new T.CylinderGeometry(3.2, 3.2, 0.4, 16), 0x9a6a3a, 0, 1.6, 0],
-      [new T.CylinderGeometry(2.6, 2.8, 2.4, 16), 0xe8c890, 0, 3.0, 0],
-      [new T.ConeGeometry(4.4, 3.4, 16), 0xd8a848, 0, 5.8, 0],
-      [new T.CylinderGeometry(0.9, 0.9, 1.8, 12, 1, false, 0, Math.PI), 0x3a2416, 0, 2.7, 2.5, 0, -Math.PI / 2, 0],
+      [new T.CylinderGeometry(3.2, 3.2, 0.4, 11), 0x9a6a3a, 0, 1.6, 0],
+      [new T.CylinderGeometry(2.6, 2.8, 2.4, 11), 0xe8c890, 0, 3.0, 0],
+      [new T.ConeGeometry(4.4, 3.4, 11), 0xd8a848, 0, 5.8, 0],
+      [new T.CylinderGeometry(0.9, 0.9, 1.8, 8, 1, false, 0, Math.PI), 0x3a2416, 0, 2.7, 2.5, 0, -Math.PI / 2, 0],
       ...[[2.4, 2.4], [-2.4, 2.4], [2.4, -2.4], [-2.4, -2.4]].map(([x, z]) => [new T.CylinderGeometry(0.2, 0.2, 1.6, 8), 0x7a4a26, x, 0.8, z]),
     ]);
     const hl = [];
