@@ -14,7 +14,7 @@
     repair: { icon: '\uD83D\uDD27', name: 'REPAIR' },
   };
   const I = (EXT.items = { ITEMS, active: false, pads: [], rows: [], group: null });
-  let gemMesh = null, padMat = null, gemList = [];
+  let gemMesh = null, glowMesh = null, padMat = null, gemList = [];
 
   // pick straights (low curvature) spread round the lap
   function straightIdx(H, count, phase) {
@@ -83,11 +83,17 @@
       });
       I.rows.push(row);
     });
-    gemMesh = new T.InstancedMesh(new T.IcosahedronGeometry(0.75, 1), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15, metalness: 0.3, emissive: 0x332244 }), gemList.length);
+    // faceted crystal gems (stretched octahedron, flat shaded) with an additive glow shell
+    const gg = new T.OctahedronGeometry(0.42, 0);
+    gg.scale(1, 1.45, 1);
+    gemMesh = new T.InstancedMesh(gg, new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.08, metalness: 0.2, flatShading: true, emissive: 0x2a2a3a }), gemList.length);
     gemMesh.frustumCulled = false;
+    glowMesh = new T.InstancedMesh(gg, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.32, blending: T.AdditiveBlending, depthWrite: false }), gemList.length);
+    glowMesh.frustumCulled = false;
     const c = new T.Color();
-    gemList.forEach((gm, k) => { c.setHSL(k / gemList.length, 0.9, 0.6); gemMesh.setColorAt(k, c); });
-    grp.add(gemMesh);
+    const hues = [0.55, 0.13, 0.85, 0.33];
+    gemList.forEach((gm, k) => { c.setHSL(hues[k % 4], 1, 0.6); gemMesh.setColorAt(k, c); glowMesh.setColorAt(k, c); });
+    grp.add(gemMesh, glowMesh);
     G.add(grp);
   };
 
@@ -193,12 +199,16 @@
       gemList.forEach((gm, k) => {
         const s = gm.cd > 0 ? Math.max(0.001, 1 - gm.cd / 0.4) * (gm.cd < 0.4 ? 1 : 0.001) : 1;
         o.position.set(gm.x, gm.y + Math.sin(t * 2.4 + k) * 0.25, gm.z);
-        o.rotation.set(t * 0.9 + k, t * 1.4 + k, 0);
+        o.rotation.set(0, t * 1.6 + k, 0);
         o.scale.setScalar(gm.cd > 0 ? (gm.cd < 0.5 ? 1 - gm.cd * 2 : 0.001) : 1);
         o.updateMatrix();
         gemMesh.setMatrixAt(k, o.matrix);
+        o.scale.multiplyScalar(1.55 + Math.sin(t * 5 + k) * 0.12);
+        o.updateMatrix();
+        glowMesh.setMatrixAt(k, o.matrix);
       });
       gemMesh.instanceMatrix.needsUpdate = true;
+      glowMesh.instanceMatrix.needsUpdate = true;
       if (padMat) padMat.map.offset.y = -t * 1.5;
     }
     // shield bubbles + boost flames for every car

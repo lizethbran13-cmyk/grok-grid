@@ -346,59 +346,115 @@
     const T = H.THREE, S = H.samples, N = H.SAMPLES, W = H.WALL_DIST;
     EXT.anim = [];
     const B = H.bounds;
-    const vx = (B.minX + B.maxX) / 2 + 60, vz = B.maxZ + 230, vH = 150;
-    G.add(H.buildTerrain(Object.assign({ terrainHigh: 0x3a2c2c, rock: 0x2a2020, bankSlope: 0.3 }, th), (x, z, d) => {
+    const midX = (B.minX + B.maxX) / 2, midZ = (B.minZ + B.maxZ) / 2;
+    // dark basalt ground with low rolling lava-rock hills
+    G.add(H.buildTerrain(Object.assign({ bankSlope: 0.3 }, th), (x, z, d) => {
       const m = H.clamp((d - 50) / 130, 0, 1);
-      const hills = (Math.sin(x * 0.015) * Math.cos(z * 0.018) + 0.8) * 18 * m;
-      const dv = Math.hypot(x - vx, z - vz);
-      let v = Math.max(0, vH - dv * 0.62);
-      if (dv < 34) v = vH - 20 + (dv / 34) * 12;
-      return Math.max(0, Math.max(hills, v * H.clamp((d - 40) / 60, 0, 1)));
+      return Math.max(0, (Math.sin(x * 0.015) * Math.cos(z * 0.018) + 0.8) * 16 * m + Math.max(0, Math.sin(x * 0.041 + z * 0.023)) * 9 * m);
     }));
-    // crater glow, lava flows, smoke plume, lava bombs
-    const lavaM = new T.MeshBasicMaterial({ color: 0xff6a1a });
-    const cg = new T.CircleGeometry(30, 32);
-    cg.rotateX(-Math.PI / 2);
-    const crater = new T.Mesh(cg, new T.MeshBasicMaterial({ color: 0xffa020 }));
-    crater.position.set(vx, vH - 19, vz);
-    G.add(crater);
-    for (let k = 0; k < 5; k++) {
-      const a = -Math.PI / 2 + (k - 2) * 0.45 + 0.1;
-      const pts = [];
-      for (let j = 0; j <= 10; j++) {
-        const r = 30 + j * 16, wob = Math.sin(j * 1.3 + k) * 8;
-        const x = vx + Math.cos(a) * r - Math.sin(a) * wob, z = vz + Math.sin(a) * r + Math.cos(a) * wob;
-        pts.push([x, Math.max(1, vH - 14 - (r - 34) * 0.62), z]);
+    // ---- real 3D volcanoes: faceted basalt cones, glowing craters, lava rivers down the slopes ----
+    const lavaTex = (() => {
+      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128;
+      const g = cv.getContext('2d');
+      g.fillStyle = '#ff4a08'; g.fillRect(0, 0, 64, 128);
+      for (let i = 0; i < 60; i++) { g.fillStyle = ['#ffb030', '#ffe070', '#c02a04', '#ff8a20'][i % 4]; g.beginPath(); g.ellipse(Math.random() * 64, Math.random() * 128, 3 + Math.random() * 9, 2 + Math.random() * 6, 0, 0, TAU); g.fill(); }
+      const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(1, 6); return t;
+    })();
+    const slopeLavaM = new T.MeshBasicMaterial({ map: lavaTex });
+    const basaltM = new T.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, metalness: 0.05 });
+    const glowM = new T.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.35, blending: T.AdditiveBlending, depthWrite: false });
+    const smokeM = new T.MeshStandardMaterial({ color: 0x4a4044, flatShading: true, roughness: 1, transparent: true, opacity: 0.88 });
+    const bombM = new T.MeshBasicMaterial({ color: 0xffa020 });
+    const craters = [];
+    const prof = (R, Hh) => [[R * 1.04, -6], [R, 0], [R * 0.82, Hh * 0.14], [R * 0.6, Hh * 0.4], [R * 0.4, Hh * 0.7], [R * 0.24, Hh * 0.95], [R * 0.2, Hh], [R * 0.15, Hh * 0.9], [0.01, Hh * 0.86]];
+    const yAt = (pf, r) => { for (let k = 1; k < 7; k++) { const a = pf[k], b = pf[k + 1]; if (r <= a[0] && r >= b[0]) return a[1] + ((a[0] - r) / (a[0] - b[0])) * (b[1] - a[1]); } return 0; };
+    const makeVolcano = (x, z, R, Hh, seed, flows) => {
+      const pf = prof(R, Hh);
+      let g = new T.LatheGeometry(pf.map(([r, y]) => new T.Vector2(r, y)), 40);
+      g = g.toNonIndexed();
+      const pos = g.attributes.position, col = [], c = new T.Color();
+      // rocky jitter (radial), keyed on position so shared edges stay closed
+      for (let i = 0; i < pos.count; i++) {
+        const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+        const r = Math.hypot(px, pz);
+        if (r > R * 0.22 && py > 1) {
+          const n = Math.sin(px * 0.09 + seed) * Math.cos(pz * 0.08 - seed) * 0.05 + Math.sin(py * 0.2 + seed * 2) * 0.03;
+          pos.setX(i, px * (1 + n)); pos.setZ(i, pz * (1 + n));
+        }
       }
-      G.add(new T.Mesh(U.tube(T, pts, 2.4, 40, 6), lavaM));
-    }
-    const smokeM = new T.MeshLambertMaterial({ color: 0x6a5a5a, transparent: true, opacity: 0.75, depthWrite: false });
-    const puffs = [];
-    for (let k = 0; k < 12; k++) {
-      const m = new T.Mesh(new T.IcosahedronGeometry(1, 1), smokeM);
+      for (let i = 0; i < pos.count; i += 3) {
+        const yy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3 / Hh;
+        const inner = Math.hypot(pos.getX(i), pos.getZ(i)) < R * 0.19;
+        if (inner) c.setHex(0xc83a08);
+        else if (yy > 0.9) c.setHex(0x5a1e10);
+        else c.setRGB(0.1 + yy * 0.06 + ((i * 7) % 5) * 0.008, 0.08 + yy * 0.03, 0.085 + yy * 0.03);
+        for (let k = 0; k < 3; k++) col.push(c.r, c.g, c.b);
+      }
+      g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+      g.computeVertexNormals();
+      const m = new T.Mesh(g, basaltM);
+      m.position.set(x, 0, z);
+      m.receiveShadow = true;
       G.add(m);
-      puffs.push({ m, ph: k / 12 });
-    }
-    const bombM = new T.MeshBasicMaterial({ color: 0xffb030 });
-    const bombs = [];
-    for (let k = 0; k < 7; k++) {
-      const m = new T.Mesh(new T.IcosahedronGeometry(2.2, 1), bombM);
-      G.add(m);
-      bombs.push({ m, ph: k * 0.37, a: k * 0.9 });
-    }
-    EXT.anim.push((t) => {
-      for (const p of puffs) {
-        const q = (t * 0.06 + p.ph) % 1;
-        p.m.position.set(vx + Math.sin(q * 5 + p.ph * 9) * 10 + q * 60, vH - 10 + q * 170, vz + q * 30);
-        p.m.scale.setScalar(12 + q * 34);
+      // crater lava pool + glow dome
+      const pool = new T.Mesh(new T.CylinderGeometry(R * 0.16, R * 0.16, 2, 28), new T.MeshBasicMaterial({ color: 0xffa020 }));
+      pool.position.set(x, Hh * 0.87, z);
+      G.add(pool);
+      const dome = new T.Mesh(new T.SphereGeometry(R * 0.24, 20, 10, 0, TAU, 0, Math.PI / 2), glowM);
+      dome.scale.y = 0.7;
+      dome.position.set(x, Hh * 0.88, z);
+      G.add(dome);
+      // lava rivers running down the cone (tubes hugging the slope)
+      for (let k = 0; k < flows; k++) {
+        const a = seed + k * (TAU / flows) + Math.sin(k * 3.1) * 0.4;
+        const pts = [];
+        for (let j = 0; j <= 14; j++) {
+          const r = R * (0.21 + (j / 14) * 0.78), wob = Math.sin(j * 0.9 + k * 2) * R * 0.035;
+          const ca = Math.cos(a), sa = Math.sin(a);
+          pts.push([x + ca * r - sa * wob, yAt(pf, r) * 1.0 + R * 0.012, z + sa * r + ca * wob]);
+        }
+        G.add(new T.Mesh(U.tube(T, pts, R * (0.022 - k * 0.002), 48, 6), slopeLavaM));
       }
-      for (const b of bombs) {
-        const q = (t * 0.28 + b.ph) % 1;
-        const r = q * 70;
-        b.m.position.set(vx + Math.cos(b.a) * r, vH - 15 + q * 90 - q * q * 120, vz + Math.sin(b.a) * r);
-      }
-      crater.material.color.setHSL(0.07, 1, 0.5 + Math.sin(t * 3) * 0.06);
+      // 3D smoke plume (faceted puffs) + lava bombs
+      const puffs = [];
+      for (let k = 0; k < 14; k++) { const pm = new T.Mesh(new T.IcosahedronGeometry(1, 1), smokeM); G.add(pm); puffs.push({ m: pm, ph: k / 14 }); }
+      const bombs = [];
+      for (let k = 0; k < 6; k++) { const bm = new T.Mesh(new T.DodecahedronGeometry(R * 0.012 + 1.2, 0), bombM); G.add(bm); bombs.push({ m: bm, ph: k * 0.37 + seed, a: k * 1.05 + seed }); }
+      craters.push({ x, z, R, Hh, puffs, bombs, pool });
+    };
+    // place: one giant volcano behind the track, two smaller ones; pushed back until they clear the circuit
+    [[midX + 40, B.maxZ + 260, 250, 230, 3, 6], [B.minX - 200, midZ + 40, 150, 120, 1, 4], [B.maxX + 190, B.minZ + 60, 130, 100, 5, 3]].forEach(([x, z, R, Hh, seed, fl]) => {
+      for (let k = 0; k < 20 && H.trackDist(x, z).d < R * 1.04 + 40; k++) { const dx = x - midX, dz = z - midZ, l = Math.hypot(dx, dz) || 1; x += (dx / l) * 30; z += (dz / l) * 30; }
+      makeVolcano(x, z, R, Hh, seed, fl);
     });
+    EXT.anim.push((t) => {
+      for (const v of craters) {
+        for (const p of v.puffs) {
+          const q = (t * 0.045 + p.ph) % 1;
+          p.m.position.set(v.x + Math.sin(q * 5 + p.ph * 9) * v.R * 0.05 + q * v.R * 0.5, v.Hh * 0.92 + q * v.Hh * 1.1, v.z + q * v.R * 0.15);
+          p.m.scale.setScalar(v.R * (0.07 + q * 0.2));
+          p.m.rotation.set(q * 3 + p.ph, q * 2, 0);
+        }
+        for (const b of v.bombs) {
+          const q = (t * 0.22 + b.ph) % 1, r = q * v.R * 0.45;
+          b.m.position.set(v.x + Math.cos(b.a) * r, v.Hh * 0.9 + q * v.Hh * 0.6 - q * q * v.Hh * 0.9, v.z + Math.sin(b.a) * r);
+          b.m.rotation.set(t * 2 + b.a, t, 0);
+        }
+        v.pool.material.color.setHSL(0.07, 1, 0.52 + Math.sin(t * 3) * 0.06);
+      }
+      lavaTex.offset.y = -t * 0.08;
+    });
+    // hexagonal basalt column clusters
+    const cols = [];
+    H.scatter(H.isTouch ? 40 : 60, W + 14, W + 70, 6).forEach((p, i) => {
+      for (let k = 0; k < 5; k++) {
+        const a = k * 1.3 + i, r = k ? 1.6 + (k % 2) * 0.8 : 0;
+        cols.push({ x: p.x + Math.cos(a) * r, y: p.y - 0.8, z: p.z + Math.sin(a) * r, sx: 1.1, sy: 3 + ((i * 3 + k * 5) % 7) * 0.9, sz: 1.1, ry: a });
+      }
+    });
+    const colG = new T.CylinderGeometry(0.95, 1, 1, 6);
+    colG.translate(0, 0.5, 0);
+    G.add(U.chunked(H, colG, new T.MeshStandardMaterial({ color: 0x2a2428, flatShading: true, roughness: 0.9 }), cols, { cast: true, far: 420 }));
     // lava rivers beside the track (flowing texture)
     const lt = (() => {
       const cv = document.createElement('canvas');
@@ -433,6 +489,17 @@
       G.add(U.chunked(H, new T.DodecahedronGeometry(1, 0), new T.MeshLambertMaterial({ color: 0x2a2224 }), bank, { far: 300 }));
     });
     EXT.anim.push((t) => { lt.offset.y = -t * 0.12; });
+    // rising 3D embers (tiny glowing crystals, not flat sprites) over the lava
+    const emb = [], embN = H.isTouch ? 70 : 120;
+    for (let k = 0; k < embN; k++) { const sm = S[Math.floor(H.srand() * N)], off = (W + 8 + H.srand() * 10) * (H.srand() < 0.5 ? 1 : -1); emb.push({ x: sm.x + sm.nx * off, y: sm.y, z: sm.z + sm.nz * off, ph: H.srand(), sp: 0.5 + H.srand() }); }
+    const embM = new T.InstancedMesh(new T.OctahedronGeometry(0.18, 0), new T.MeshBasicMaterial({ color: 0xffb040 }), embN);
+    embM.frustumCulled = false;
+    G.add(embM);
+    const eo = new T.Object3D();
+    EXT.anim.push((t) => {
+      for (let k = 0; k < embN; k++) { const e = emb[k], q = (t * 0.25 * e.sp + e.ph) % 1; eo.position.set(e.x + Math.sin(t + k) * 1.5, e.y + q * 14, e.z + Math.cos(t * 0.7 + k) * 1.5); eo.rotation.set(t * 3 + k, t * 2, 0); eo.scale.setScalar(1.2 - q); eo.updateMatrix(); embM.setMatrixAt(k, eo.matrix); }
+      embM.instanceMatrix.needsUpdate = true;
+    });
     // palms
     const palm = (flip) => {
       const parts = [];
@@ -505,11 +572,10 @@
     seaM.rotation.x = -Math.PI / 2;
     seaM.position.set(cx0, -0.9, B.minZ - 900);
     G.add(seaM);
-    const sun = new T.Mesh(new T.CircleGeometry(70, 32), new T.MeshBasicMaterial({ color: 0xffd080, fog: false }));
+    const sun = new T.Mesh(new T.SphereGeometry(55, 24, 16), new T.MeshBasicMaterial({ color: 0xffc070, fog: false }));
     sun.position.set(cx0 - 500, 90, B.minZ - 1000);
     sun.lookAt(cx0, 0, cz0);
     G.add(sun);
-    H.addParticles(G, H.isTouch ? 90 : 160, 0xffa040, 0.5, 0.9, 'leaves');
   };
 
   EXT.tickAnim = function (t, dt) {
