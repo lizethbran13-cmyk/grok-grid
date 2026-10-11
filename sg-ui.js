@@ -232,6 +232,18 @@
     if (EXT.hub.active) EXT.hub.frame(tAcc, paused ? 0 : dt);
     else EXT.tickAnim(tAcc, paused ? 0 : dt);
     EXT.items.frame(tAcc, dt);
+    // a rival tucked right behind you can swallow the chase camera: hide it while it is that close
+    if (!EXT.hub.active) {
+      const cp = api.camera.position, pl = api.player;
+      const dp = Math.hypot(pl.x - cp.x, pl.z - cp.z);
+      const near = Math.min(6.5, dp - 1.2);
+      for (const c of api.cars) {
+        if (c.isPlayer || c.out) { if (c._camHid) { c._camHid = false; if (!c.out) c.vis.root.visible = true; } continue; }
+        const d = Math.hypot(c.x - cp.x, c.z - cp.z, (c.y || 0) + 0.6 - cp.y);
+        if (!c._camHid && d < near && c.vis.root.visible) { c._camHid = true; c.vis.root.visible = false; }
+        else if (c._camHid && d > near + 0.8) { c._camHid = false; c.vis.root.visible = true; }
+      }
+    }
     lodT -= dt;
     if (lodT <= 0) { lodT = 0.3; EXT.updateLod(api.camera); }
     const ib = $('sg-item');
